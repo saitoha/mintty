@@ -652,7 +652,7 @@ void win_clear_images(void)
 
   for (img = term.imgs.first; img; ) {
     if (img->hdc)
-      ReleaseDC(wnd, img->hdc);
+      DeleteDC(img->hdc);
     else
       free(img->pixels);
     prev = img;
@@ -662,7 +662,7 @@ void win_clear_images(void)
 
   for (img = term.imgs.altfirst; img; ) {
     if (img->hdc)
-      ReleaseDC(wnd, img->hdc);
+      DeleteDC(img->hdc);
     else
       free(img->pixels);
     prev = img;
@@ -687,7 +687,7 @@ image_paint(void)
   for (img = term.imgs.first; img; ) {
     if (img && img->top + img->pixelheight / cell_height - term.virtuallines < - term.sblen) {
       if (img->hdc)
-        ReleaseDC(wnd, img->hdc);
+        DeleteDC(img->hdc);
       else
         free(img->pixels);
       if (img == term.imgs.first)
