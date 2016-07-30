@@ -1001,7 +1001,7 @@ do_dcs(void)
         write_linefeed();
       }
 
-      x0 = term.curs.x;
+      term.curs.x = x0;
       term.curs.attr.attr = attr0;
 
       if (term.imgs.first == NULL) {
