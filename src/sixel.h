@@ -4,13 +4,15 @@
 #include "config.h"
 
 #define DECSIXEL_PARAMS_MAX 16
+#define DECSIXEL_PALETTE_MAX 1024
 
 typedef struct sixel_image_buffer {
   unsigned char *data;
   int width;
   int height;
-  int palette[256];
+  int palette[DECSIXEL_PALETTE_MAX];
   int ncolors;
+  int palette_modified;
 } sixel_image_t;
 
 typedef enum parse_state {
@@ -40,7 +42,7 @@ typedef struct parser_context {
   sixel_image_t image;
 } sixel_state_t;
 
-int sixel_parser_init(sixel_state_t *context);
+int sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor);
 int sixel_parser_parse(sixel_state_t *context, unsigned char *p, int len);
 int sixel_parser_finalize(sixel_state_t *context);
 

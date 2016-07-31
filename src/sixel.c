@@ -16,7 +16,7 @@
 
 static int const sixel_default_color_table[] = {
     SIXEL_XRGB(0,  0,  0),   /*  0 Black    */
-    SIXEL_XRGB(20, 20, 20),  /*  1 Blue     */
+    SIXEL_XRGB(20, 20, 80),  /*  1 Blue     */
     SIXEL_XRGB(80, 13, 13),  /*  2 Red      */
     SIXEL_XRGB(20, 80, 20),  /*  3 Green    */
     SIXEL_XRGB(80, 20, 80),  /*  4 Magenta  */
@@ -33,21 +33,51 @@ static int const sixel_default_color_table[] = {
     SIXEL_XRGB(80, 80, 80),  /* 15 Gray 75% */
 };
 
-
 static int
-sixel_image_init(
-  sixel_image_t    *image,
-  int         width,
-  int         height,
-  int         bgindex)
+set_default_color(sixel_image_t *image)
 {
-  int status = (-1);
-  size_t size;
   int i;
   int n;
   int r;
   int g;
   int b;
+
+  /* palette initialization */
+  for (n = 1; n < 17; n++) {
+    image->palette[n] = sixel_default_color_table[n - 1];
+  }
+
+  /* colors 17-230 are a 6x6x6 color cube */
+  for (r = 0; r < 6; r++) {
+    for (g = 0; g < 6; g++) {
+      for (b = 0; b < 6; b++) {
+        image->palette[n++] = SIXEL_RGB(r * 51, g * 51, b * 51);
+      }
+    }
+  }
+
+  /* colors 233-254 are a grayscale ramp, intentionally leaving out */
+  for (i = 0; i < 24; i++) {
+    image->palette[n++] = SIXEL_RGB(i * 11, i * 11, i * 11);
+  }
+
+  for (; n < DECSIXEL_PALETTE_MAX; n++) {
+    image->palette[n] = SIXEL_RGB(255, 255, 255);
+  }
+
+  return (0);
+}
+
+static int
+sixel_image_init(
+  sixel_image_t    *image,
+  int              width,
+  int              height,
+  int              fgcolor,
+  int              bgcolor)
+{
+  int status = (-1);
+  size_t size;
 
   size = (size_t)(width * height) * sizeof(unsigned char);
   image->width = width;
@@ -59,30 +89,11 @@ sixel_image_init(
     status = (-1);
     goto end;
   }
-  memset(image->data, bgindex, size);
+  memset(image->data, 0, size);
 
-  /* palette initialization */
-  for (n = 0; n < 16; n++) {
-    image->palette[n] = sixel_default_color_table[n];
-  }
-
-  /* colors 16-231 are a 6x6x6 color cube */
-  for (r = 0; r < 6; r++) {
-    for (g = 0; g < 6; g++) {
-      for (b = 0; b < 6; b++) {
-        image->palette[n++] = SIXEL_RGB(r * 51, g * 51, b * 51);
-      }
-    }
-  }
-
-  /* colors 232-255 are a grayscale ramp, intentionally leaving out */
-  for (i = 0; i < 24; i++) {
-    image->palette[n++] = SIXEL_RGB(i * 11, i * 11, i * 11);
-  }
-
-  for (; n < 256; n++) {
-    image->palette[n] = SIXEL_RGB(255, 255, 255);
-  }
+  image->palette[0] = bgcolor;
+  image->palette[1] = fgcolor;
+  image->palette_modified = 0;
 
   status = (0);
 
@@ -95,8 +106,7 @@ static int
 image_buffer_resize(
   sixel_image_t   *image,
   int         width,
-  int         height,
-  int         bgindex)
+  int         height)
 {
   int status = (-1);
   size_t size;
@@ -123,7 +133,7 @@ image_buffer_resize(
            (size_t)image->width);
       /* fill extended area with background color */
       memset(alt_buffer + width * n + image->width,
-           bgindex,
+           0,
            (size_t)(width - image->width));
     }
   } else {
@@ -138,7 +148,7 @@ image_buffer_resize(
   if (height > image->height) {  /* if height is extended */
     /* fill extended area with background color */
     memset(alt_buffer + width * image->height,
-         bgindex,
+         0,
          (size_t)(width * (height - image->height)));
   }
 
@@ -157,7 +167,7 @@ end:
 
 
 int
-sixel_parser_init(sixel_state_t *st)
+sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor)
 {
   int status = (-1);
 
@@ -171,13 +181,12 @@ sixel_parser_init(sixel_state_t *st)
   st->attributed_ph = 0;
   st->attributed_pv = 0;
   st->repeat_count = 1;
-  st->color_index = 15;
-  st->bgindex = (-1);
+  st->color_index = 16;
   st->nparams = 0;
   st->param = 0;
 
   /* buffer initialization */
-  status = sixel_image_init(&st->image, 1, 1, st->bgindex);
+  status = sixel_image_init(&st->image, 1, 1, fgcolor, bgcolor);
 
   return status;
 }
@@ -197,7 +206,14 @@ sixel_parser_finalize(sixel_state_t *st)
   }
 
   if (image->width > st->max_x || image->height > st->max_y) {
-    status = image_buffer_resize(image, st->max_x, st->max_y, st->bgindex);
+    status = image_buffer_resize(image, st->max_x, st->max_y);
+    if (status < 0) {
+      goto end;
+    }
+  }
+
+  if (image->ncolors > 2 && !image->palette_modified) {
+    status = set_default_color(image);
     if (status < 0) {
       goto end;
     }
@@ -276,7 +292,7 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
               sx *= 2;
               sy *= 2;
             }
-            status = image_buffer_resize(image, sx, sy, st->bgindex);
+            status = image_buffer_resize(image, sx, sy);
             if (status < 0) {
               goto end;
             }
@@ -320,8 +336,8 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
                   }
                   for (y = st->pos_y + i; y < st->pos_y + i + n; ++y) {
                     memset(image->data + image->width * y + st->pos_x,
-                         st->color_index,
-                         (size_t)st->repeat_count);
+                           st->color_index,
+                           (size_t)st->repeat_count);
                   }
                   if (st->max_x < (st->pos_x + st->repeat_count - 1)) {
                     st->max_x = st->pos_x + st->repeat_count - 1;
@@ -407,7 +423,7 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
             sy = image->height;
           }
 
-          status = image_buffer_resize(image, sx, sy, st->bgindex);
+          status = image_buffer_resize(image, sx, sy);
           if (status < 0) {
             goto end;
           }
@@ -485,15 +501,16 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
         st->param = 0;
 
         if (st->nparams > 0) {
-          st->color_index = st->params[0];
+          st->color_index = 1 + st->params[0];  /* offset 1(background color) added */
           if (st->color_index < 0) {
             st->color_index = 0;
-          } else if (st->color_index >= 256) {
-            st->color_index = 256 - 1;
+          } else if (st->color_index >= DECSIXEL_PALETTE_MAX) {
+            st->color_index = DECSIXEL_PALETTE_MAX - 1;
           }
         }
 
         if (st->nparams > 4) {
+          st->image.palette_modified = 1;
           if (st->params[1] == 1) {
             /* HLS */
             if (st->params[2] > 360) {

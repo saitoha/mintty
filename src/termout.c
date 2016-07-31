@@ -944,6 +944,7 @@ do_dcs(void)
   int x, y;
   int x0;
   int attr0;
+  colour bg, fg;
 
   switch (term.dcs_cmd) {
   when 'q':
@@ -977,7 +978,24 @@ do_dcs(void)
           *dst++ = color >> 16 & 0xff;   /* b */
           dst++;                         /* a */
         }
-        dst += 4 * (alloc_pixelwidth - st.image.width);
+        /* fill right padding with bgcolor */
+        for (; x < alloc_pixelwidth; ++x) {
+          color = st.image.palette[0];   /* bgcolor */
+          *dst++ = color >> 0 & 0xff;    /* r */
+          *dst++ = color >> 8 & 0xff;    /* g */
+          *dst++ = color >> 16 & 0xff;   /* b */
+          dst++;                         /* a */
+        }
+      }
+      /* fill bottom padding with bgcolor */
+      for (; y < alloc_pixelheight; ++y) {
+        for (x = 0; x < alloc_pixelwidth; ++x) {
+          color = st.image.palette[0];   /* bgcolor */
+          *dst++ = color >> 0 & 0xff;    /* r */
+          *dst++ = color >> 8 & 0xff;    /* g */
+          *dst++ = color >> 16 & 0xff;   /* b */
+          dst++;                         /* a */
+        }
       }
 
       img = (imglist *)malloc(sizeof(imglist));
@@ -1022,7 +1040,11 @@ do_dcs(void)
 
     otherwise:
       /* parser st initialization */
-      status = sixel_parser_init(&st);
+      fg = win_get_colour(term.rvideo ? BG_COLOUR_I: FG_COLOUR_I);
+      bg = win_get_colour(term.rvideo ? FG_COLOUR_I: BG_COLOUR_I);
+      status = sixel_parser_init(&st,
+                                 (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
+                                 (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16);
       if (status < 0)
         return;
     }
