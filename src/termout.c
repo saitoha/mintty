@@ -569,6 +569,8 @@ set_modes(bool state)
           term.disptop = 0;
         when 67: /* DECBKM: backarrow key mode */
           term.backspace_sends_bs = state;
+        when 80: /* DECSDM: sixel display mode */
+          term.sixel_display = state;
         when 1000: /* VT200_MOUSE */
           term.mouse_mode = state ? MM_VT200 : 0;
           win_update_mouse();
@@ -942,7 +944,7 @@ do_dcs(void)
   int alloc_pixelwidth, alloc_pixelheight;
   int cell_width, cell_height;
   int x, y;
-  int x0;
+  int x0, y0;
   int attr0;
   colour bg, fg;
 
@@ -1001,7 +1003,7 @@ do_dcs(void)
       img = (imglist *)malloc(sizeof(imglist));
       img->pixels = pixels;
       img->hdc = NULL;
-      img->top = term.virtuallines + term.curs.y;
+      img->top = term.virtuallines + term.sixel_display ? 0: term.curs.y;
       img->left = term.curs.x;
       img->pixelwidth = alloc_pixelwidth;
       img->pixelheight = alloc_pixelheight;
@@ -1009,14 +1011,25 @@ do_dcs(void)
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
-
       term.curs.attr.attr = ATTR_INVALID;
 
-      for (i = 0; i < alloc_pixelheight / cell_height; ++i) {
-        term.curs.x = x0;
-        for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
-          write_char(0x20, 1);
-        write_linefeed();
+      if (term.sixel_display) {
+        y0 = term.curs.y;
+        term.curs.y = 0;
+        for (y = 0; y < alloc_pixelheight / cell_height && y < term.rows; ++y) {
+          term.curs.y = y;
+          term.curs.x = 0;
+          for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
+            write_char(0x20, 1);
+        }
+        term.curs.y = y0;
+      } else {
+        for (i = 0; i < alloc_pixelheight / cell_height; ++i) {
+          term.curs.x = x0;
+          for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
+            write_char(0x20, 1);
+          write_linefeed();
+        }
       }
 
       term.curs.x = x0;

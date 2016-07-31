@@ -354,6 +354,7 @@ struct term {
   bool report_ambig_width;
   bool bracketed_paste;
   bool show_scrollbar;
+  bool sixel_display;  // true if sixel scrolling mode is off
 
   int  cursor_type;
   int  cursor_blinks;
