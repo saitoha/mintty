@@ -1003,7 +1003,7 @@ do_dcs(void)
       img = (imglist *)malloc(sizeof(imglist));
       img->pixels = pixels;
       img->hdc = NULL;
-      img->top = term.virtuallines + term.sixel_display ? 0: term.curs.y;
+      img->top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       img->left = term.curs.x;
       img->pixelwidth = alloc_pixelwidth;
       img->pixelheight = alloc_pixelheight;
