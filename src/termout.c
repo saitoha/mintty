@@ -569,8 +569,6 @@ set_modes(bool state)
           term.disptop = 0;
         when 67: /* DECBKM: backarrow key mode */
           term.backspace_sends_bs = state;
-        when 80: /* DECSDM: sixel display mode */
-          term.sixel_display = state;
         when 1000: /* VT200_MOUSE */
           term.mouse_mode = state ? MM_VT200 : 0;
           win_update_mouse();
@@ -1003,7 +1001,7 @@ do_dcs(void)
       img = (imglist *)malloc(sizeof(imglist));
       img->pixels = pixels;
       img->hdc = NULL;
-      img->top = term.virtuallines + term.sixel_display ? 0: term.curs.y;
+      img->top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       img->left = term.curs.x;
       img->pixelwidth = alloc_pixelwidth;
       img->pixelheight = alloc_pixelheight;
