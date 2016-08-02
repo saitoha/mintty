@@ -631,6 +631,9 @@ set_modes(bool state)
           term.wheel_reporting = state;
         when 7787:       /* 'W': Application mousewheel mode */
           term.app_wheel = state;
+        when 8452:       /* on: sixel scrolling leaves cursor to right of graphic
+                            off: sixel scrolling moves cursor to beginning of line */
+          term.sixel_scrolls_right = state;
         /* Application control key modes */
         when 77000 ... 77031: {
           int ctrl = arg - 77000;
@@ -1021,16 +1024,23 @@ do_dcs(void)
             write_char(0x20, 1);
         }
         term.curs.y = y0;
-      } else {
+        term.curs.x = x0;
+      } else {  // sixel scrolling mode
         for (i = 0; i < alloc_pixelheight / cell_height; ++i) {
           term.curs.x = x0;
           for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
             write_char(0x20, 1);
-          write_linefeed();
+          if (i == alloc_pixelheight / cell_height - 1) {  // in the last line
+            if (!term.sixel_scrolls_right) {
+              write_linefeed();
+              term.curs.x = x0;
+            }
+          } else {
+            write_linefeed();
+          }
         }
       }
 
-      term.curs.x = x0;
       term.curs.attr.attr = attr0;
 
       if (term.imgs.first == NULL) {

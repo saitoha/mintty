@@ -354,8 +354,10 @@ struct term {
   bool report_ambig_width;
   bool bracketed_paste;
   bool show_scrollbar;
-  bool sixel_display;  // true if sixel scrolling mode is off
 
+  bool sixel_display;  // true if sixel scrolling mode is off
+  bool sixel_scrolls_right;  // on:  sixel scrolling leaves cursor to right of graphic
+                             // off: sixel scrolling moves cursor to beginning of line */
   int  cursor_type;
   int  cursor_blinks;
   bool cursor_invalid;
