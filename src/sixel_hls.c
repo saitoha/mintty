@@ -1,6 +1,5 @@
 // sixel.c (part of mintty)
-// hls_to_rgb() function is derived from graphics.c in Xterm pl#310 originally written by Ross Combs.
-// Licensed under the terms of the GNU General Public License v3 or later.
+// this function is derived from a part of graphics.c in Xterm pl#310 originally written by Ross Combs.
 
 #define SIXEL_RGB(r, g, b) (((r) << 16) + ((g) << 8) +  (b))
 
