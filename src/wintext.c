@@ -683,7 +683,6 @@ image_paint(void)
   BITMAPINFO bmpinfo;
   unsigned char *pixels;
   HBITMAP hbmp;
-  int redraw_flag = 0;
 
   for (img = term.imgs.first; img; ) {
     if (img && img->top + img->pixelheight / cell_height - term.virtuallines < - term.sblen) {
@@ -723,15 +722,11 @@ image_paint(void)
                (img->top - term.virtuallines - term.disptop) * cell_height + PADDING,
                img->pixelwidth, img->pixelheight, img->hdc,
                0, 0, SRCCOPY);
-        redraw_flag = 1;
       }
       prev = img;
       img = img->next;
     }
   }
-
-  if (term.sixel_display && redraw_flag)
-    term_invalidate(0, 0, term.cols, term.rows);
 }
 
 static void
