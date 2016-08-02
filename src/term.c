@@ -142,6 +142,8 @@ term_reset(void)
   term.imgs.last = NULL;
   term.imgs.altfirst = NULL;
   term.imgs.altlast = NULL;
+  term.sixel_display = 0;
+  term.sixel_scrolls_right = 0;
 
   term.marg_top = 0;
   term.marg_bot = term.rows - 1;
