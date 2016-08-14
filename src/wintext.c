@@ -683,6 +683,9 @@ image_paint(void)
   BITMAPINFO bmpinfo;
   unsigned char *pixels;
   HBITMAP hbmp;
+  int left, top;
+  int x, y;
+  termchar *tchar;
 
   for (img = term.imgs.first; img; ) {
     if (img && img->top + img->pixelheight / cell_height - term.virtuallines < - term.sblen) {
@@ -717,11 +720,32 @@ image_paint(void)
           img->pixels = pixels;
         }
       }
-      if ((img->top - term.virtuallines - term.disptop) * cell_height + img->pixelheight > 0) {
-        BitBlt(dc, img->left * cell_width + PADDING,
-               (img->top - term.virtuallines - term.disptop) * cell_height + PADDING,
-               img->pixelwidth, img->pixelheight, img->hdc,
-               0, 0, SRCCOPY);
+      left = img->left;
+      top = img->top - term.virtuallines - term.disptop;
+      if (top + img->height > 0) {
+        if (term.disptop >= 0) {
+          for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
+            for (x = left; x < min(left + img->width, term.cols); ++x) {
+              tchar = &term.lines[y]->chars[x];
+              if (y - top >= 0 && !(tchar->attr.attr & TATTR_SIXEL)) {
+                tchar->attr.attr |= TATTR_SIXEL;
+                BitBlt(img->hdc,
+                       (x - left) * cell_width,
+                       (y - top) * cell_height,
+                       cell_width,
+                       cell_height,
+                       dc,
+                       x * cell_width + PADDING,
+                       y * cell_height + PADDING,
+                       SRCCOPY);
+              }
+            }
+          }
+        }
+        StretchBlt(dc, img->left * cell_width + PADDING,
+                   (img->top - term.virtuallines - term.disptop) * cell_height + PADDING,
+                   img->width * cell_width, img->height * cell_height, img->hdc,
+                   0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
       }
       prev = img;
       img = img->next;

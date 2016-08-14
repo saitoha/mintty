@@ -112,6 +112,8 @@ enum {
   TATTR_RESULT    = 0x100000000000u, /* search result */
   TATTR_CURRESULT = 0x200000000000u, /* current search result */
 
+  TATTR_SIXEL     = 0x400000000000u, /* sixel image */
+
   DATTR_STARTRUN  = 0x080000000000u, /* start of redraw run */
   DATTR_MASK      = 0x0F0000000000u,
 };
@@ -280,6 +282,8 @@ typedef struct _imglist {
   void *hdc;
   int top;
   int left;
+  int width;
+  int height;
   int pixelwidth;
   int pixelheight;
   struct _imglist *next;

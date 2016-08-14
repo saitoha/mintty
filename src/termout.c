@@ -927,7 +927,7 @@ do_csi(uchar c)
 static void
 do_dcs(void)
 {
-  // Only DECRQSS (Request Status String) is implemented.
+  // DECRQSS (Request Status String) and DECSIXEL are implemented.
   // No DECUDK (User-Defined Keys) or xterm termcap/terminfo data.
 
   char *s = term.cmd_buf;
@@ -948,6 +948,7 @@ do_dcs(void)
   int x0, y0;
   int attr0;
   colour bg, fg;
+  imglist *cur;
 
   switch (term.dcs_cmd) {
   when 'q':
@@ -1006,31 +1007,34 @@ do_dcs(void)
       img->hdc = NULL;
       img->top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       img->left = term.curs.x;
+      img->width = alloc_pixelwidth / cell_width;
+      img->height = alloc_pixelheight / cell_height;
       img->pixelwidth = alloc_pixelwidth;
       img->pixelheight = alloc_pixelheight;
       img->next = NULL;
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
-      term.curs.attr.attr = ATTR_INVALID;
+      term.curs.attr.attr |= ATTR_INVALID | TATTR_SIXEL;
 
-      if (term.sixel_display) {
+      if (term.sixel_display) {  // sixel display mode
         y0 = term.curs.y;
         term.curs.y = 0;
-        for (y = 0; y < alloc_pixelheight / cell_height && y < term.rows; ++y) {
+        for (y = 0; y < img->height && y < term.rows; ++y) {
           term.curs.y = y;
           term.curs.x = 0;
-          for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
+          for (x = x0; x < x0 + img->width && x < term.cols; ++x) {
             write_char(0x20, 1);
+	  }
         }
         term.curs.y = y0;
         term.curs.x = x0;
       } else {  // sixel scrolling mode
-        for (i = 0; i < alloc_pixelheight / cell_height; ++i) {
+        for (i = 0; i < img->height; ++i) {
           term.curs.x = x0;
-          for (x = x0; x < x0 + alloc_pixelwidth / cell_width && x < term.cols; ++x)
+          for (x = x0; x < x0 + img->width && x < term.cols; ++x)
             write_char(0x20, 1);
-          if (i == alloc_pixelheight / cell_height - 1) {  // in the last line
+          if (i == img->height - 1) {  // in the last line
             if (!term.sixel_scrolls_right) {
               write_linefeed();
               term.curs.x = x0;
@@ -1046,13 +1050,28 @@ do_dcs(void)
       if (term.imgs.first == NULL) {
         term.imgs.first = term.imgs.last = img;
       } else {
-        imglist *cur;
         for (cur = term.imgs.first; cur; cur = cur->next) {
-          if (img->top >= cur->top && img->top * cell_height + img->pixelheight <= cur->top * cell_height + cur->pixelheight &&
-              img->left >= cur->left && img->left * cell_width + img->pixelwidth <= cur->left * cell_width + cur->pixelwidth) {
-              memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-              free(img->pixels);
-              return;
+          if (cur->pixelwidth == cur->width * cell_width &&
+              cur->pixelheight == cur->height * cell_height) {
+            if (img->top == cur->top && img->left == cur->left &&
+                img->width == cur->width &&
+                img->height == cur->height) {
+                memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
+                free(img->pixels);
+                return;
+            }
+            if (img->top >= cur->top && img->left >= cur->left &&
+                img->left + img->width <= cur->left + cur->width &&
+                img->top + img->height <= cur->top + cur->height) {
+                for (y = 0; y < img->pixelwidth; ++y)
+                  memcpy(cur->pixels +
+                           ((img->top - cur->top) * cell_height + y) * cur->pixelwidth * 4 +
+                           (img->left - cur->left) * cell_width * 4,
+                         img->pixels,
+                         img->pixelwidth * 4);
+                free(img->pixels);
+                return;
+            }
           }
         }
         term.imgs.last->next = img;
