@@ -569,6 +569,8 @@ set_modes(bool state)
           term.disptop = 0;
         when 67: /* DECBKM: backarrow key mode */
           term.backspace_sends_bs = state;
+        when 80: /* DECSDM: SIXEL display mode */
+          term.sixel_display = state;
         when 1000: /* VT200_MOUSE */
           term.mouse_mode = state ? MM_VT200 : 0;
           win_update_mouse();
