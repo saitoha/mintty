@@ -689,7 +689,7 @@ image_paint(void)
   bool update_flag;
 
   for (img = term.imgs.first; img; ) {
-    if (img && img->top + img->pixelheight / cell_height - term.virtuallines < - term.sblen) {
+    if (img->top + img->height - term.virtuallines < - term.sblen) {
       if (img->hdc)
         DeleteDC(img->hdc);
       else
@@ -725,24 +725,27 @@ image_paint(void)
       top = img->top - term.virtuallines - term.disptop;
 
       if (top + img->height > 0) {
-        for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
-          for (x = left; x < min(left + img->width, term.cols); ++x) {
-            tchar = &term.lines[y]->chars[x];
-            dchar = &term.displines[y]->chars[x];
-            update_flag = false;
-            if (term.disptop >= 0 && !(tchar->attr.attr & TATTR_SIXEL)) {
-              update_flag = true;
-              tchar->attr.attr |= TATTR_SIXEL;
-            }
-            if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
-              update_flag = true;
-            if (update_flag) {
-              BitBlt(img->hdc, (x - left) * cell_width, (y - top) * cell_height,
-                     cell_width, cell_height,
-                     dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
+        if (!img->refresh) {
+          for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
+            for (x = left; x < min(left + img->width, term.cols); ++x) {
+              tchar = &term.lines[y]->chars[x];
+              dchar = &term.displines[y]->chars[x];
+              update_flag = false;
+              if (term.disptop >= 0 && !(tchar->attr.attr & TATTR_SIXEL)) {
+                update_flag = true;
+                tchar->attr.attr |= TATTR_SIXEL;
+              }
+              if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
+                update_flag = true;
+              if (update_flag) {
+                BitBlt(img->hdc, (x - left) * cell_width, (y - top) * cell_height,
+                       cell_width, cell_height,
+                       dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
+              }
             }
           }
         }
+        img->refresh = 0;
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);

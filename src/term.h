@@ -286,6 +286,7 @@ typedef struct _imglist {
   int height;
   int pixelwidth;
   int pixelheight;
+  int refresh;
   struct _imglist *next;
 } imglist;
 

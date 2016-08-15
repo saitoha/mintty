@@ -594,10 +594,10 @@ term_resize(int newrows, int newcols)
     saved_curs->y = max(0, saved_curs->y - store);
 
     // Adjust image position
-    for (img = term.imgs.first; img; img = img->next)
-      if (img->top - term.virtuallines - term.disptop - destroy > 0)
-        if (curs->y + destroy > term.rows)
-          img->top += destroy;
+    for (img = term.imgs.first; img; img = img->next) {
+      img->top += destroy;
+      img->refresh = 1;
+    }
   }
 
   term.lines = lines = renewn(lines, newrows);
@@ -629,9 +629,10 @@ term_resize(int newrows, int newcols)
     saved_curs->y += restore;
 
     // Adjust image position
-    for (img = term.imgs.first; img; img = img->next)
-      if (img->top - term.virtuallines - term.disptop + restore > 0)
-        img->top += restore;
+    for (img = term.imgs.first; img; img = img->next) {
+      img->top += restore;
+      img->refresh = 1;
+    }
   }
 
   // Resize lines

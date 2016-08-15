@@ -1014,6 +1014,7 @@ do_dcs(void)
       img->pixelwidth = alloc_pixelwidth;
       img->pixelheight = alloc_pixelheight;
       img->next = NULL;
+      img->refresh = 1;
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
