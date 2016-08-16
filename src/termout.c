@@ -957,17 +957,23 @@ do_dcs(void)
     switch (term.state) {
     when DCS_PASSTHROUGH:
       status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
-      if (status < 0)
+      if (status < 0) {
+         term.state = DCS_IGNORE;
          return;
+      }
 
     when DCS_ESCAPE:
       status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
-      if (status < 0)
+      if (status < 0) {
+         term.state = DCS_IGNORE;
          return;
+      }
 
       status = sixel_parser_finalize(&st);
-      if (status < 0)
+      if (status < 0) {
+         term.state = DCS_IGNORE;
          return;
+      }
 
       win_get_pixels(&height, &width);
       cell_width = width / term.cols;
@@ -1003,10 +1009,12 @@ do_dcs(void)
           dst++;                         /* a */
         }
       }
+      free(st.image.data);
 
       img = (imglist *)malloc(sizeof(imglist));
       img->pixels = pixels;
       img->hdc = NULL;
+      img->hbmp = NULL;
       img->top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       img->left = term.curs.x;
       img->width = alloc_pixelwidth / cell_width;
@@ -1061,18 +1069,20 @@ do_dcs(void)
                 img->height == cur->height) {
                 memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
                 free(img->pixels);
+                free(img);
                 return;
             }
             if (img->top >= cur->top && img->left >= cur->left &&
                 img->left + img->width <= cur->left + cur->width &&
                 img->top + img->height <= cur->top + cur->height) {
-                for (y = 0; y < img->pixelwidth; ++y)
+                for (y = 0; y < img->pixelheight; ++y)
                   memcpy(cur->pixels +
                            ((img->top - cur->top) * cell_height + y) * cur->pixelwidth * 4 +
                            (img->left - cur->left) * cell_width * 4,
-                         img->pixels,
+                         img->pixels + y * img->pixelwidth * 4,
                          img->pixelwidth * 4);
                 free(img->pixels);
+                free(img);
                 return;
             }
           }

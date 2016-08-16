@@ -651,20 +651,24 @@ void win_clear_images(void)
   imglist *img, *prev;
 
   for (img = term.imgs.first; img; ) {
-    if (img->hdc)
+    if (img->hdc) {
       DeleteDC(img->hdc);
-    else
+      DeleteObject(img->hbmp);
+    } else {
       free(img->pixels);
+    }
     prev = img;
     img = img->next;
     free(prev);
   }
 
   for (img = term.imgs.altfirst; img; ) {
-    if (img->hdc)
+    if (img->hdc) {
       DeleteDC(img->hdc);
-    else
+      DeleteObject(img->hbmp);
+    } else {
       free(img->pixels);
+    }
     prev = img;
     img = img->next;
     free(prev);
@@ -681,19 +685,21 @@ image_paint(void)
 {
   imglist *img, *prev = NULL;
   BITMAPINFO bmpinfo;
-  unsigned char *pixels;
-  HBITMAP hbmp;
   int left, top;
   int x, y;
   termchar *tchar, *dchar;
   bool update_flag;
+  int n = 0;
+  unsigned char *pixels;
 
-  for (img = term.imgs.first; img; ) {
+  for (img = term.imgs.first; img; ++n) {
     if (img->top + img->height - term.virtuallines < - term.sblen) {
-      if (img->hdc)
+      if (img->hdc) {
         DeleteDC(img->hdc);
-      else
+	DeleteObject(img->hbmp);
+      } else {
         free(img->pixels);
+      }
       if (img == term.imgs.first)
         term.imgs.first = img->next;
       if (img == term.imgs.last)
@@ -714,8 +720,8 @@ image_paint(void)
         pixels = malloc(img->pixelwidth * img->pixelheight * 4);
         if (pixels) {
           img->hdc = CreateCompatibleDC(dc);
-          hbmp = CreateDIBSection(dc, &bmpinfo, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
-          SelectObject(img->hdc, hbmp);
+          img->hbmp = CreateDIBSection(dc, &bmpinfo, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
+          SelectObject(img->hdc, img->hbmp);
           memcpy(pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
           free(img->pixels);
           img->pixels = pixels;

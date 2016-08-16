@@ -280,6 +280,7 @@ typedef struct _imglist {
   unsigned char *palette;
   int ncolors;
   void *hdc;
+  void *hbmp;
   int top;
   int left;
   int width;
