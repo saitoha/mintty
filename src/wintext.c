@@ -8,6 +8,7 @@
 #include "charset.h"  // wcscpy
 
 #include "minibidi.h"
+#include "winimg.h"
 
 #include <winnls.h>
 
@@ -646,121 +647,7 @@ win_paint(void)
   EndPaint(wnd, &p);
 }
 
-void win_clear_images(void)
-{
-  imglist *img, *prev;
 
-  for (img = term.imgs.first; img; ) {
-    if (img->hdc) {
-      DeleteDC(img->hdc);
-      DeleteObject(img->hbmp);
-    } else {
-      free(img->pixels);
-    }
-    prev = img;
-    img = img->next;
-    free(prev);
-  }
-
-  for (img = term.imgs.altfirst; img; ) {
-    if (img->hdc) {
-      DeleteDC(img->hdc);
-      DeleteObject(img->hbmp);
-    } else {
-      free(img->pixels);
-    }
-    prev = img;
-    img = img->next;
-    free(prev);
-  }
-
-  term.imgs.first = NULL;
-  term.imgs.last = NULL;
-  term.imgs.first = NULL;
-  term.imgs.last = NULL;
-}
-
-static void
-image_paint(void)
-{
-  imglist *img, *prev = NULL;
-  BITMAPINFO bmpinfo;
-  int left, top;
-  int x, y;
-  termchar *tchar, *dchar;
-  bool update_flag;
-  int n = 0;
-  unsigned char *pixels;
-
-  for (img = term.imgs.first; img; ++n) {
-    if (img->top + img->height - term.virtuallines < - term.sblen) {
-      if (img->hdc) {
-        DeleteDC(img->hdc);
-	DeleteObject(img->hbmp);
-      } else {
-        free(img->pixels);
-      }
-      if (img == term.imgs.first)
-        term.imgs.first = img->next;
-      if (img == term.imgs.last)
-        term.imgs.last = prev;
-      if (prev)
-        prev->next = img->next;
-      prev = img;
-      img = img->next;
-      free(prev);
-    } else {
-      if (img->hdc == NULL) {
-        bmpinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmpinfo.bmiHeader.biWidth = img->pixelwidth;
-        bmpinfo.bmiHeader.biHeight = - img->pixelheight;
-        bmpinfo.bmiHeader.biPlanes = 1;
-        bmpinfo.bmiHeader.biBitCount = 32;
-        bmpinfo.bmiHeader.biCompression = BI_RGB;
-        pixels = malloc(img->pixelwidth * img->pixelheight * 4);
-        if (pixels) {
-          img->hdc = CreateCompatibleDC(dc);
-          img->hbmp = CreateDIBSection(dc, &bmpinfo, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
-          SelectObject(img->hdc, img->hbmp);
-          memcpy(pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-          free(img->pixels);
-          img->pixels = pixels;
-        }
-      }
-      left = img->left;
-      top = img->top - term.virtuallines - term.disptop;
-
-      if (top + img->height > 0) {
-        if (!img->refresh) {
-          for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
-            for (x = left; x < min(left + img->width, term.cols); ++x) {
-              tchar = &term.lines[y]->chars[x];
-              dchar = &term.displines[y]->chars[x];
-              update_flag = false;
-              if (term.disptop >= 0 && !(tchar->attr.attr & TATTR_SIXEL)) {
-                update_flag = true;
-                tchar->attr.attr |= TATTR_SIXEL;
-              }
-              if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
-                update_flag = true;
-              if (update_flag) {
-                BitBlt(img->hdc, (x - left) * cell_width, (y - top) * cell_height,
-                       cell_width, cell_height,
-                       dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
-              }
-            }
-          }
-        }
-        img->refresh = 0;
-        StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
-                   img->width * cell_width, img->height * cell_height, img->hdc,
-                   0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
-      }
-      prev = img;
-      img = img->next;
-    }
-  }
-}
 
 static void
 do_update(void)
@@ -778,7 +665,7 @@ do_update(void)
   term_update_search();
 
   term_paint();
-  image_paint();
+  winimg_paint();
 
   ReleaseDC(wnd, dc);
 

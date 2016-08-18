@@ -105,8 +105,8 @@ end:
 static int
 image_buffer_resize(
   sixel_image_t   *image,
-  int         width,
-  int         height)
+  int              width,
+  int              height)
 {
   int status = (-1);
   size_t size;
@@ -165,9 +165,22 @@ end:
   return status;
 }
 
+static unsigned char *
+sixel_image_get_buffer(sixel_image_t *image)
+{
+  return image->data;
+}
+
+static void
+sixel_image_deinit(sixel_image_t *image)
+{
+  free(image->data);
+}
 
 int
-sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor)
+sixel_parser_init(sixel_state_t *st,
+                  int fgcolor, int bgcolor,
+                  int grid_width, int grid_height)
 {
   int status = (-1);
 
@@ -182,6 +195,8 @@ sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor)
   st->attributed_pv = 0;
   st->repeat_count = 1;
   st->color_index = 16;
+  st->grid_width = grid_width;
+  st->grid_height = grid_height;
   st->nparams = 0;
   st->param = 0;
 
@@ -195,6 +210,8 @@ int
 sixel_parser_finalize(sixel_state_t *st)
 {
   int status = (-1);
+  int sx;
+  int sy;
   sixel_image_t *image = &st->image;
 
   if (++st->max_x < st->attributed_ph) {
@@ -205,8 +222,11 @@ sixel_parser_finalize(sixel_state_t *st)
     st->max_y = st->attributed_pv;
   }
 
-  if (image->width > st->max_x || image->height > st->max_y) {
-    status = image_buffer_resize(image, st->max_x, st->max_y);
+  sx = (st->max_x + st->grid_width - 1) / st->grid_width * st->grid_width;
+  sy = (st->max_y + st->grid_height - 1) / st->grid_height * st->grid_height;
+
+  if (image->width > sx || image->height > sy) {
+    status = image_buffer_resize(image, sx, sy);
     if (status < 0) {
       goto end;
     }
@@ -219,12 +239,53 @@ sixel_parser_finalize(sixel_state_t *st)
     }
   }
 
+  int alloc_pixelwidth, alloc_pixelheight;
+  int x, y;
+  unsigned char *src, *dst, *pixels;
+  int color;
+
+  alloc_pixelwidth = (st->image.width + st->grid_width - 1) / st->grid_width * st->grid_width;
+  alloc_pixelheight = (st->image.height + st->grid_height - 1) / st->grid_height * st->grid_height;
+  src = sixel_parser_get_buffer(st);
+  dst = pixels = (unsigned char *)malloc(alloc_pixelwidth * alloc_pixelheight * 4);
+  for (y = 0; y < st->image.height; ++y) {
+    for (x = 0; x < st->image.width; ++x) {
+      color = st->image.palette[*src++];
+      *dst++ = color >> 0 & 0xff;    /* r */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 16 & 0xff;   /* b */
+      dst++;                         /* a */
+    }
+    /* fill right padding with bgcolor */
+    for (; x < alloc_pixelwidth; ++x) {
+      color = st->image.palette[0];  /* bgcolor */
+      *dst++ = color >> 0 & 0xff;    /* r */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 16 & 0xff;   /* b */
+      dst++;                         /* a */
+    }
+  }
+  /* fill bottom padding with bgcolor */
+  for (; y < alloc_pixelheight; ++y) {
+    for (x = 0; x < alloc_pixelwidth; ++x) {
+      color = st->image.palette[0];  /* bgcolor */
+      *dst++ = color >> 0 & 0xff;    /* r */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 16 & 0xff;   /* b */
+      dst++;                         /* a */
+    }
+  }
+
+  free(st->image.data);
+  st->image.data = pixels;
+  st->image.width = alloc_pixelwidth;
+  st->image.height = alloc_pixelheight;
+
   status = (0);
 
 end:
   return status;
 }
-
 
 /* convert sixel data into indexed pixel bytes and palette data */
 int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
@@ -423,6 +484,8 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
             sy = image->height;
           }
 
+          sx = (sx + st->grid_width - 1) / st->grid_width * st->grid_width;
+          sy = (sy + st->grid_height - 1) / st->grid_height * st->grid_height;
           status = image_buffer_resize(image, sx, sy);
           if (status < 0) {
             goto end;
@@ -551,4 +614,16 @@ int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len)
 
 end:
   return status;
+}
+
+unsigned char *
+sixel_parser_get_buffer(sixel_state_t *st)
+{
+  return sixel_image_get_buffer(&st->image);
+}
+
+void
+sixel_parser_deinit(sixel_state_t *st)
+{
+  sixel_image_deinit(&st->image);
 }

@@ -11,6 +11,7 @@
 #include "child.h"
 #include "print.h"
 #include "sixel.h"
+#include "winimg.h"
 
 #include <sys/termios.h>
 
@@ -374,7 +375,7 @@ do_esc(uchar c)
     when 'Z':  /* DECID: terminal type query */
       child_write(primary_da, sizeof primary_da - 1);
     when 'c':  /* RIS: restore power-on settings */
-      win_clear_images();
+      winimgs_clear();
       term_reset();
       if (term.reset_132) {
         win_set_chars(term.rows, 80);
@@ -933,24 +934,19 @@ do_dcs(void)
   // No DECUDK (User-Defined Keys) or xterm termcap/terminfo data.
 
   char *s = term.cmd_buf;
-  unsigned char *dst;
-  unsigned char *src;
   unsigned char *pixels;
   int i;
-  imglist *img;
+  imglist *cur, *img;
+  colour bg, fg;
   cattr attr = term.curs.attr;
   int status = (-1);
-  int color;
   static sixel_state_t st;
-  int width;
-  int height;
-  int alloc_pixelwidth, alloc_pixelheight;
-  int cell_width, cell_height;
+  int w;
+  int h;
   int x, y;
   int x0, y0;
   int attr0;
-  colour bg, fg;
-  imglist *cur;
+  int left, top, width, height, pixelwidth, pixelheight;
 
   switch (term.dcs_cmd) {
   when 'q':
@@ -959,6 +955,7 @@ do_dcs(void)
       status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
       if (status < 0) {
          term.state = DCS_IGNORE;
+         sixel_parser_deinit(&st);
          return;
       }
 
@@ -966,77 +963,43 @@ do_dcs(void)
       status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
       if (status < 0) {
          term.state = DCS_IGNORE;
+         sixel_parser_deinit(&st);
          return;
       }
 
       status = sixel_parser_finalize(&st);
       if (status < 0) {
          term.state = DCS_IGNORE;
+         sixel_parser_deinit(&st);
          return;
       }
 
-      win_get_pixels(&height, &width);
-      cell_width = width / term.cols;
-      cell_height = height / term.rows;
-      alloc_pixelwidth = (st.image.width + cell_width - 1) / cell_width * cell_width;
-      alloc_pixelheight = (st.image.height + cell_height - 1) / cell_height * cell_height;
-      src = st.image.data;
-      dst = pixels = (unsigned char *)calloc(1, alloc_pixelwidth * alloc_pixelheight * 4);
-      for (y = 0; y < st.image.height; ++y) {
-        for (x = 0; x < st.image.width; ++x) {
-          color = st.image.palette[*src++];
-          *dst++ = color >> 0 & 0xff;    /* r */
-          *dst++ = color >> 8 & 0xff;    /* g */
-          *dst++ = color >> 16 & 0xff;   /* b */
-          dst++;                         /* a */
-        }
-        /* fill right padding with bgcolor */
-        for (; x < alloc_pixelwidth; ++x) {
-          color = st.image.palette[0];   /* bgcolor */
-          *dst++ = color >> 0 & 0xff;    /* r */
-          *dst++ = color >> 8 & 0xff;    /* g */
-          *dst++ = color >> 16 & 0xff;   /* b */
-          dst++;                         /* a */
-        }
-      }
-      /* fill bottom padding with bgcolor */
-      for (; y < alloc_pixelheight; ++y) {
-        for (x = 0; x < alloc_pixelwidth; ++x) {
-          color = st.image.palette[0];   /* bgcolor */
-          *dst++ = color >> 0 & 0xff;    /* r */
-          *dst++ = color >> 8 & 0xff;    /* g */
-          *dst++ = color >> 16 & 0xff;   /* b */
-          dst++;                         /* a */
-        }
-      }
-      free(st.image.data);
+      pixels = sixel_parser_get_buffer(&st);
+      left = term.curs.x;
+      top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
+      width = st.image.width / st.grid_width;
+      height = st.image.height / st.grid_height;
+      pixelwidth = st.image.width;
+      pixelheight = st.image.height;
 
-      img = (imglist *)malloc(sizeof(imglist));
-      img->pixels = pixels;
-      img->hdc = NULL;
-      img->hbmp = NULL;
-      img->top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
-      img->left = term.curs.x;
-      img->width = alloc_pixelwidth / cell_width;
-      img->height = alloc_pixelheight / cell_height;
-      img->pixelwidth = alloc_pixelwidth;
-      img->pixelheight = alloc_pixelheight;
-      img->next = NULL;
-      img->refresh = 1;
+      if (!winimg_new(&img, pixels, left, top, width, height, pixelwidth, pixelheight) != 0) {
+        sixel_parser_deinit(&st);
+        return;
+      }
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
       term.curs.attr.attr |= ATTR_INVALID | TATTR_SIXEL;
 
+      // fill with space characters
       if (term.sixel_display) {  // sixel display mode
         y0 = term.curs.y;
         term.curs.y = 0;
         for (y = 0; y < img->height && y < term.rows; ++y) {
           term.curs.y = y;
           term.curs.x = 0;
-          for (x = x0; x < x0 + img->width && x < term.cols; ++x) {
+          for (x = x0; x < x0 + img->width && x < term.cols; ++x)
             write_char(0x20, 1);
-	  }
         }
         term.curs.y = y0;
         term.curs.x = x0;
@@ -1062,8 +1025,8 @@ do_dcs(void)
         term.imgs.first = term.imgs.last = img;
       } else {
         for (cur = term.imgs.first; cur; cur = cur->next) {
-          if (cur->pixelwidth == cur->width * cell_width &&
-              cur->pixelheight == cur->height * cell_height) {
+          if (cur->pixelwidth == cur->width * st.grid_width &&
+              cur->pixelheight == cur->height * st.grid_height) {
             if (img->top == cur->top && img->left == cur->left &&
                 img->width == cur->width &&
                 img->height == cur->height) {
@@ -1077,8 +1040,8 @@ do_dcs(void)
                 img->top + img->height <= cur->top + cur->height) {
                 for (y = 0; y < img->pixelheight; ++y)
                   memcpy(cur->pixels +
-                           ((img->top - cur->top) * cell_height + y) * cur->pixelwidth * 4 +
-                           (img->left - cur->left) * cell_width * 4,
+                           ((img->top - cur->top) * st.grid_height + y) * cur->pixelwidth * 4 +
+                           (img->left - cur->left) * st.grid_width * 4,
                          img->pixels + y * img->pixelwidth * 4,
                          img->pixelwidth * 4);
                 free(img->pixels);
@@ -1092,12 +1055,15 @@ do_dcs(void)
       }
 
     otherwise:
-      /* parser st initialization */
+      win_get_pixels(&h, &w);
+
+      /* parser status initialization */
       fg = win_get_colour(term.rvideo ? BG_COLOUR_I: FG_COLOUR_I);
       bg = win_get_colour(term.rvideo ? FG_COLOUR_I: BG_COLOUR_I);
       status = sixel_parser_init(&st,
                                  (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
-                                 (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16);
+                                 (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16,
+                                 w / term.cols, h / term.rows);
       if (status < 0)
         return;
     }

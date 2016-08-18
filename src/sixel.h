@@ -36,14 +36,18 @@ typedef struct parser_context {
   int repeat_count;
   int color_index;
   int bgindex;
+  int grid_width;
+  int grid_height;
   int param;
   int nparams;
   int params[DECSIXEL_PARAMS_MAX];
   sixel_image_t image;
 } sixel_state_t;
 
-int sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor);
-int sixel_parser_parse(sixel_state_t *context, unsigned char *p, int len);
-int sixel_parser_finalize(sixel_state_t *context);
+int sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor, int grid_width, int grid_height);
+int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len);
+int sixel_parser_finalize(sixel_state_t *st);
+void sixel_parser_deinit(sixel_state_t *st);
+unsigned char * sixel_parser_get_buffer(sixel_state_t *st);
 
 #endif
