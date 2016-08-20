@@ -213,6 +213,9 @@ sixel_parser_finalize(sixel_state_t *st)
   int sx;
   int sy;
   sixel_image_t *image = &st->image;
+  int x, y;
+  unsigned char *src, *dst, *pixels;
+  int color;
 
   if (++st->max_x < st->attributed_ph) {
     st->max_x = st->attributed_ph;
@@ -239,15 +242,8 @@ sixel_parser_finalize(sixel_state_t *st)
     }
   }
 
-  int alloc_pixelwidth, alloc_pixelheight;
-  int x, y;
-  unsigned char *src, *dst, *pixels;
-  int color;
-
-  alloc_pixelwidth = (st->image.width + st->grid_width - 1) / st->grid_width * st->grid_width;
-  alloc_pixelheight = (st->image.height + st->grid_height - 1) / st->grid_height * st->grid_height;
   src = sixel_parser_get_buffer(st);
-  dst = pixels = (unsigned char *)malloc(alloc_pixelwidth * alloc_pixelheight * 4);
+  dst = pixels = (unsigned char *)malloc(st->image.width * st->image.height * 4);
   for (y = 0; y < st->image.height; ++y) {
     for (x = 0; x < st->image.width; ++x) {
       color = st->image.palette[*src++];
@@ -257,7 +253,7 @@ sixel_parser_finalize(sixel_state_t *st)
       dst++;                         /* a */
     }
     /* fill right padding with bgcolor */
-    for (; x < alloc_pixelwidth; ++x) {
+    for (; x < st->image.width; ++x) {
       color = st->image.palette[0];  /* bgcolor */
       *dst++ = color >> 0 & 0xff;    /* r */
       *dst++ = color >> 8 & 0xff;    /* g */
@@ -266,8 +262,8 @@ sixel_parser_finalize(sixel_state_t *st)
     }
   }
   /* fill bottom padding with bgcolor */
-  for (; y < alloc_pixelheight; ++y) {
-    for (x = 0; x < alloc_pixelwidth; ++x) {
+  for (; y < st->image.height; ++y) {
+    for (x = 0; x < st->image.width; ++x) {
       color = st->image.palette[0];  /* bgcolor */
       *dst++ = color >> 0 & 0xff;    /* r */
       *dst++ = color >> 8 & 0xff;    /* g */
@@ -278,8 +274,6 @@ sixel_parser_finalize(sixel_state_t *st)
 
   free(st->image.data);
   st->image.data = pixels;
-  st->image.width = alloc_pixelwidth;
-  st->image.height = alloc_pixelheight;
 
   status = (0);
 

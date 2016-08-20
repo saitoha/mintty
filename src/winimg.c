@@ -97,18 +97,18 @@ winimgs_clear(void)
 {
   imglist *img, *prev;
 
+  // clear images in current screen
   for (img = term.imgs.first; img; ) {
-    winimg_destroy(img);
     prev = img;
     img = img->next;
-    free(prev);
+    winimg_destroy(prev);
   }
 
+  // clear images in alternate screen
   for (img = term.imgs.altfirst; img; ) {
-    winimg_destroy(img);
     prev = img;
     img = img->next;
-    free(prev);
+    winimg_destroy(prev);
   }
 
   term.imgs.first = NULL;
