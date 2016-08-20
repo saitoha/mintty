@@ -281,13 +281,14 @@ typedef struct _imglist {
   int ncolors;
   void *hdc;
   void *hbmp;
+  void *fp;
   int top;
   int left;
   int width;
   int height;
   int pixelwidth;
   int pixelheight;
-  int refresh;
+  bool refresh;
   struct _imglist *next;
 } imglist;
 

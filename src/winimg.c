@@ -33,22 +33,26 @@ winimg_new(imglist **ppimg, unsigned char *pixels,
   img->pixelwidth = pixelwidth;
   img->pixelheight = pixelheight;
   img->next = NULL;
-  img->refresh = 1;
+  img->refresh = true;
 
   *ppimg = img;
 
   return true;
 }
 
-void
+// create DC handle if it is not initialized, or resume from hibernate
+static void
 winimg_lazyinit(imglist *img)
 {
   BITMAPINFO bmpinfo;
   unsigned char *pixels;
   HDC dc;
+  size_t size;
  
   if (img->hdc)
     return;
+
+  size = img->pixelwidth * img->pixelheight * 4;
 
   dc = GetDC(wnd);
 
@@ -61,23 +65,50 @@ winimg_lazyinit(imglist *img)
   img->hdc = CreateCompatibleDC(dc);
   img->hbmp = CreateDIBSection(dc, &bmpinfo, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
   SelectObject(img->hdc, img->hbmp);
-  CopyMemory(pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-  free(img->pixels);
+  if (img->pixels) {
+    CopyMemory(pixels, img->pixels, size);
+    free(img->pixels);
+  } else {
+    // resume from hibernation
+    fflush((FILE *)img->fp);
+    fseek((FILE *)img->fp, 0L, SEEK_SET);
+    fread(pixels, 1, size, (FILE *)img->fp);
+    fclose((FILE *)img->fp);
+  }
   img->pixels = pixels;
 
   ReleaseDC(wnd, dc);
 }
 
-int
-winimg_getleft(imglist *img)
+// serialize an image into a temp file to save the memory
+static void
+winimg_hibernate(imglist *img)
 {
-  return img->left;
-}
+  FILE *fp;
+  size_t nbytes;
+  size_t size;
 
-int
-winimg_gettop(imglist *img)
-{
-  return img->top - term.virtuallines - term.disptop;
+  size = img->pixelwidth * img->pixelheight * 4;
+
+  if (!img->hdc)
+    return;
+  fp = tmpfile();
+  if (!fp)
+    return;
+  nbytes = fwrite(img->pixels, 1, size, fp);
+  if (nbytes != size) {
+    fclose(fp);
+    return;
+  }
+
+  // delete allocated DIB section.
+  DeleteDC(img->hdc);
+  DeleteObject(img->hbmp);
+  img->pixels = NULL;
+  img->hdc = NULL;
+  img->hbmp = NULL;
+
+  img->fp = fp;
 }
 
 void
@@ -86,8 +117,10 @@ winimg_destroy(imglist *img)
   if (img->hdc) {
     DeleteDC(img->hdc);
     DeleteObject(img->hbmp);
-  } else {
+  } else if (img->pixels) {
     free(img->pixels);
+  } else {
+    fclose((FILE *)img->fp);
   }
   free(img);
 }
@@ -126,11 +159,10 @@ winimg_paint(void)
   int x, y;
   termchar *tchar, *dchar;
   bool update_flag;
-  int n = 0;
   HDC dc = GetDC(wnd);
 
-  for (img = term.imgs.first; img; ++n) {
-    // if the image is out of scrollbackjjj
+  for (img = term.imgs.first; img;) {
+    // if the image is out of scrollback, collect it
     if (img->top + img->height - term.virtuallines < - term.sblines) {
       if (img == term.imgs.first)
         term.imgs.first = img->next;
@@ -141,13 +173,16 @@ winimg_paint(void)
       prev = img;
       img = img->next;
       winimg_destroy(prev);
+    } else if (img->top + img->height - term.virtuallines - term.disptop < - term.rows * 10 ||
+               img->top - term.virtuallines - term.disptop - term.rows > term.rows * 10) {
+      // if the image position is far from current display, serialize it into a temp file.
+      winimg_hibernate(img);
     } else {
-      if (img->hdc == NULL)
-        winimg_lazyinit(img);
-      left = winimg_getleft(img);
-      top = winimg_gettop(img);
-
+      left = img->left;
+      top = img->top - term.virtuallines - term.disptop;
       if (top + img->height > 0) {
+        // create DC handle if it is not initialized, or resume from hibernate
+        winimg_lazyinit(img);
         if (!img->refresh) {
           for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
             for (x = left; x < min(left + img->width, term.cols); ++x) {
@@ -167,7 +202,7 @@ winimg_paint(void)
             }
           }
         }
-        img->refresh = 0;
+        img->refresh = false;
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
