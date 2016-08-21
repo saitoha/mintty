@@ -138,6 +138,7 @@ term_reset(void)
   term.show_scrollbar = true;
 
   term.virtuallines = 0;
+  term.imgs.parser_state = NULL;
   term.imgs.first = NULL;
   term.imgs.last = NULL;
   term.imgs.altfirst = NULL;

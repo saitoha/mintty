@@ -175,6 +175,7 @@ static void
 sixel_image_deinit(sixel_image_t *image)
 {
   free(image->data);
+  image->data = NULL;
 }
 
 int

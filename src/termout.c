@@ -349,8 +349,6 @@ do_esc(uchar c)
       term.state = OSC_START;
     when 'P':  /* DCS: device control string */
       term.state = DCS_START;
-      term.cmd_num = -1;
-      term.cmd_len = 0;
     when '^' or '_': /* PM: privacy message, APC: application program command */
       term.state = IGNORE_STRING;
     when '7':  /* DECSC: save cursor */
@@ -940,50 +938,68 @@ do_dcs(void)
   colour bg, fg;
   cattr attr = term.curs.attr;
   int status = (-1);
-  static sixel_state_t st;
   int w;
   int h;
   int x, y;
   int x0, y0;
   int attr0;
   int left, top, width, height, pixelwidth, pixelheight;
+  sixel_state_t *st;
 
   switch (term.dcs_cmd) {
   when 'q':
+
+    st = (sixel_state_t *)term.imgs.parser_state;
+
     switch (term.state) {
     when DCS_PASSTHROUGH:
-      status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
+      if (!st)
+        return;
+      if (!st->image.data)
+        return;
+      status = sixel_parser_parse(st, (unsigned char *)s, term.cmd_len);
       if (status < 0) {
+         sixel_parser_deinit(st);
+         free(term.imgs.parser_state);
+         term.imgs.parser_state = NULL;
          term.state = DCS_IGNORE;
-         sixel_parser_deinit(&st);
          return;
       }
 
     when DCS_ESCAPE:
-      status = sixel_parser_parse(&st, (unsigned char *)s, term.cmd_len);
+      if (!st)
+        return;
+      if (!st->image.data)
+        return;
+      status = sixel_parser_parse(st, (unsigned char *)s, term.cmd_len);
       if (status < 0) {
-         term.state = DCS_IGNORE;
-         sixel_parser_deinit(&st);
+         sixel_parser_deinit(st);
+         free(term.imgs.parser_state);
+         term.imgs.parser_state = NULL;
          return;
       }
 
-      status = sixel_parser_finalize(&st);
+      status = sixel_parser_finalize(st);
       if (status < 0) {
-         term.state = DCS_IGNORE;
-         sixel_parser_deinit(&st);
+         sixel_parser_deinit(st);
+         free(term.imgs.parser_state);
+         term.imgs.parser_state = NULL;
          return;
       }
 
-      pixels = sixel_parser_get_buffer(&st);
+      pixels = sixel_parser_get_buffer(st);
+      st->image.data = NULL;
       left = term.curs.x;
       top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
-      width = st.image.width / st.grid_width;
-      height = st.image.height / st.grid_height;
-      pixelwidth = st.image.width;
-      pixelheight = st.image.height;
+      width = st->image.width / st->grid_width;
+      height = st->image.height / st->grid_height;
+      pixelwidth = st->image.width;
+      pixelheight = st->image.height;
 
       if (!winimg_new(&img, pixels, left, top, width, height, pixelwidth, pixelheight) != 0) {
-        sixel_parser_deinit(&st);
+        sixel_parser_deinit(st);
+        free(term.imgs.parser_state);
+        term.imgs.parser_state = NULL;
         return;
       }
 
@@ -1025,14 +1041,13 @@ do_dcs(void)
         term.imgs.first = term.imgs.last = img;
       } else {
         for (cur = term.imgs.first; cur; cur = cur->next) {
-          if (cur->pixelwidth == cur->width * st.grid_width &&
-              cur->pixelheight == cur->height * st.grid_height) {
+          if (cur->pixelwidth == cur->width * st->grid_width &&
+              cur->pixelheight == cur->height * st->grid_height) {
             if (img->top == cur->top && img->left == cur->left &&
                 img->width == cur->width &&
                 img->height == cur->height) {
                 memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-                free(img->pixels);
-                free(img);
+                winimg_destroy(img);
                 return;
             }
             if (img->top >= cur->top && img->left >= cur->left &&
@@ -1040,12 +1055,11 @@ do_dcs(void)
                 img->top + img->height <= cur->top + cur->height) {
                 for (y = 0; y < img->pixelheight; ++y)
                   memcpy(cur->pixels +
-                           ((img->top - cur->top) * st.grid_height + y) * cur->pixelwidth * 4 +
-                           (img->left - cur->left) * st.grid_width * 4,
+                           ((img->top - cur->top) * st->grid_height + y) * cur->pixelwidth * 4 +
+                           (img->left - cur->left) * st->grid_width * 4,
                          img->pixels + y * img->pixelwidth * 4,
                          img->pixelwidth * 4);
-                free(img->pixels);
-                free(img);
+                winimg_destroy(img);
                 return;
             }
           }
@@ -1060,7 +1074,9 @@ do_dcs(void)
       /* parser status initialization */
       fg = win_get_colour(term.rvideo ? BG_COLOUR_I: FG_COLOUR_I);
       bg = win_get_colour(term.rvideo ? FG_COLOUR_I: BG_COLOUR_I);
-      status = sixel_parser_init(&st,
+      if (!st)
+        st = term.imgs.parser_state = calloc(1, sizeof(sixel_state_t));
+      status = sixel_parser_init(st,
                                  (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
                                  (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16,
                                  w / term.cols, h / term.rows);
@@ -1170,7 +1186,7 @@ do_colour_osc(bool has_index_arg, uint i, bool reset)
 }
 
 /*
- * Process OSC and DCS command sequences.
+ * Process OSC command sequences.
  */
 static void
 do_cmd(void)
@@ -1566,6 +1582,7 @@ term_write(const char *buf, uint len)
             term.state = ESCAPE;
         }
       when DCS_START:
+        term.cmd_num = -1;
         term.cmd_len = 0;
         term.dcs_cmd = 0;
         switch (c) {
@@ -1598,6 +1615,7 @@ term_write(const char *buf, uint len)
             term.state = DCS_PASSTHROUGH;
           when '\e':
             term.state = DCS_ESCAPE;
+            term.esc_mod = 0;
           when '0' ... '9':  /* DCS parameter */
           when ';':          /* DCS separator */
           when ':':
@@ -1619,6 +1637,7 @@ term_write(const char *buf, uint len)
             term.state = DCS_PASSTHROUGH;
           when '\e':
             term.state = DCS_ESCAPE;
+            term.esc_mod = 0;
           when '0' ... '?':  /* DCS parameter byte */
             term.state = DCS_IGNORE;
           when ' ' ... '/':  /* DCS intermediate byte */
@@ -1630,6 +1649,7 @@ term_write(const char *buf, uint len)
         switch (c) {
           when '\e':
             term.state = DCS_ESCAPE;
+            term.esc_mod = 0;
           otherwise:
             if (term.cmd_len < lengthof(term.cmd_buf) - 1) {
               term.cmd_buf[term.cmd_len++] = c;
@@ -1643,6 +1663,7 @@ term_write(const char *buf, uint len)
         switch (c) {
           when '\e':
             term.state = ESCAPE;
+            term.esc_mod = 0;
         }
       when DCS_ESCAPE:
         if (c < 0x20) {
@@ -1657,6 +1678,7 @@ term_write(const char *buf, uint len)
           term.state = NORMAL;
         } else {
           term.state = ESCAPE;
+          term.imgs.parser_state = NULL;
           do_esc(c);
 	}
     }

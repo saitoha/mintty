@@ -293,6 +293,7 @@ typedef struct _imglist {
 } imglist;
 
 typedef struct {
+  void *parser_state;
   imglist *first;
   imglist *last;
   imglist *altfirst;
