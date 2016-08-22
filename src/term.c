@@ -596,7 +596,7 @@ term_resize(int newrows, int newcols)
 
     // Adjust image position
     for (img = term.imgs.first; img; img = img->next) {
-      img->top += destroy;
+      img->top -= min(0, store);
       img->refresh = 1;
     }
   }
