@@ -1669,7 +1669,7 @@ term_write(const char *buf, uint len)
         if (c < 0x20) {
           do_ctrl(c);
           term.state = NORMAL;
-	} else if (c < 0x30) {
+        } else if (c < 0x30) {
           term.esc_mod = term.esc_mod ? 0xFF : c;
           term.state = ESCAPE;
         } else if (c == '\\') {
@@ -1680,7 +1680,7 @@ term_write(const char *buf, uint len)
           term.state = ESCAPE;
           term.imgs.parser_state = NULL;
           do_esc(c);
-	}
+        }
     }
   }
   term_schedule_search_partial_update();

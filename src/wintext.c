@@ -619,8 +619,10 @@ win_paint(void)
   // or simply term_invalidate(0, 0, term.cols, term.rows) ?
 #endif
 
-  if (update_state != UPDATE_PENDING)
+  if (update_state != UPDATE_PENDING) {
     term_paint();
+    winimg_paint();
+  }
 
   if (p.fErase || p.rcPaint.left < PADDING ||
       p.rcPaint.top < PADDING ||
