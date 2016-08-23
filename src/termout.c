@@ -1616,9 +1616,7 @@ term_write(const char *buf, uint len)
           when '\e':
             term.state = DCS_ESCAPE;
             term.esc_mod = 0;
-          when '0' ... '9':  /* DCS parameter */
-          when ';':          /* DCS separator */
-          when ':':
+          when '0' ... '9' or ';' or ':':  /* DCS parameter */
             term.state = DCS_IGNORE;
           when '<' ... '?':
             term.dcs_cmd = term.dcs_cmd << 8 | c;
