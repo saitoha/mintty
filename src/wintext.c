@@ -621,7 +621,7 @@ win_paint(void)
 
   if (update_state != UPDATE_PENDING) {
     term_paint();
-    winimg_paint();
+    winimg_paint(dc);
   }
 
   if (p.fErase || p.rcPaint.left < PADDING ||
@@ -667,7 +667,7 @@ do_update(void)
   term_update_search();
 
   term_paint();
-  winimg_paint();
+  winimg_paint(dc);
 
   ReleaseDC(wnd, dc);
 

@@ -151,7 +151,7 @@ winimgs_clear(void)
 }
 
 void
-winimg_paint(void)
+winimg_paint(HDC dc)
 {
   imglist *img;
   imglist *prev = NULL;
@@ -159,8 +159,12 @@ winimg_paint(void)
   int x, y;
   termchar *tchar, *dchar;
   bool update_flag;
-  HDC dc = GetDC(wnd);
+  RECT rc;
 
+  GetClientRect(wnd, &rc);
+  IntersectClipRect(dc, rc.left + PADDING, rc.top + PADDING,
+                    rc.left + PADDING + term.cols * cell_width,
+                    rc.top + PADDING + term.rows * cell_height);
   for (img = term.imgs.first; img;) {
     // if the image is out of scrollback, collect it
     if (img->top + img->height - term.virtuallines < - term.sblines) {
@@ -173,14 +177,13 @@ winimg_paint(void)
       prev = img;
       img = img->next;
       winimg_destroy(prev);
-    } else if (img->top + img->height - term.virtuallines - term.disptop < - term.rows * 10 ||
-               img->top - term.virtuallines - term.disptop - term.rows > term.rows * 10) {
-      // if the image position is far from current display, serialize it into a temp file.
-      winimg_hibernate(img);
     } else {
+      // if the image is scrolled out, serialize it into a temp file.
       left = img->left;
       top = img->top - term.virtuallines - term.disptop;
-      if (top + img->height > 0) {
+      if (top + img->height < 0 || top > term.rows) {
+        winimg_hibernate(img);
+      } else {
         // create DC handle if it is not initialized, or resume from hibernate
         winimg_lazyinit(img);
         if (!img->refresh) {
@@ -201,8 +204,8 @@ winimg_paint(void)
                        dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
             }
           }
+          img->refresh = false;
         }
-        img->refresh = false;
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
@@ -211,5 +214,4 @@ winimg_paint(void)
     prev = img;
     img = img->next;
   }
-  ReleaseDC(wnd, dc);
 }
