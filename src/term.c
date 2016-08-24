@@ -597,7 +597,7 @@ term_resize(int newrows, int newcols)
     // Adjust image position
     for (img = term.imgs.first; img; img = img->next) {
       img->top -= min(0, store);
-      img->refresh = 1;
+      img->refresh = true;
     }
   }
 
@@ -632,7 +632,7 @@ term_resize(int newrows, int newcols)
     // Adjust image position
     for (img = term.imgs.first; img; img = img->next) {
       img->top += restore;
-      img->refresh = 1;
+      img->refresh = true;
     }
   }
 

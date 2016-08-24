@@ -1,5 +1,4 @@
-// sixel.c (part of mintty)
-// originally written by kmiya@cluti (https://github.com/saitoha/sixel/blob/master/fromsixel.c)
+// winimg.c (part of mintty)
 // Licensed under the terms of the GNU General Public License v3 or later.
 
 #include <stdlib.h>
@@ -151,7 +150,7 @@ winimgs_clear(void)
 }
 
 void
-winimg_paint(HDC dc)
+winimg_paint(void)
 {
   imglist *img;
   imglist *prev = NULL;
@@ -159,7 +158,10 @@ winimg_paint(HDC dc)
   int x, y;
   termchar *tchar, *dchar;
   bool update_flag;
+  HDC dc;
   RECT rc;
+
+  dc = GetDC(wnd);
 
   GetClientRect(wnd, &rc);
   IntersectClipRect(dc, rc.left + PADDING, rc.top + PADDING,
@@ -204,8 +206,8 @@ winimg_paint(HDC dc)
                        dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
             }
           }
-          img->refresh = false;
         }
+        img->refresh = false;
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
@@ -214,4 +216,5 @@ winimg_paint(HDC dc)
     prev = img;
     img = img->next;
   }
+  ReleaseDC(wnd, dc);
 }
