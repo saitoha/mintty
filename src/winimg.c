@@ -212,9 +212,9 @@ winimg_paint(void)
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
       }
+      prev = img;
+      img = img->next;
     }
-    prev = img;
-    img = img->next;
   }
   ReleaseDC(wnd, dc);
 }
