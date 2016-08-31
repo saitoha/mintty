@@ -568,7 +568,6 @@ term_resize(int newrows, int newcols)
   termlines *lines = term.lines;
   term_cursor *curs = &term.curs;
   term_cursor *saved_curs = &term.saved_cursors[term.on_alt_screen];
-  imglist *img;
 
   // Shrink the screen if newrows < rows
   if (newrows < term.rows) {
@@ -595,10 +594,7 @@ term_resize(int newrows, int newcols)
     saved_curs->y = max(0, saved_curs->y - store);
 
     // Adjust image position
-    for (img = term.imgs.first; img; img = img->next) {
-      img->top -= min(0, store);
-      img->refresh = true;
-    }
+    term.virtuallines += min(0, store);
   }
 
   term.lines = lines = renewn(lines, newrows);
@@ -630,10 +626,7 @@ term_resize(int newrows, int newcols)
     saved_curs->y += restore;
 
     // Adjust image position
-    for (img = term.imgs.first; img; img = img->next) {
-      img->top += restore;
-      img->refresh = true;
-    }
+    term.virtuallines -= restore;
   }
 
   // Resize lines

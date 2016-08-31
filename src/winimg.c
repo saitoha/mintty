@@ -32,7 +32,6 @@ winimg_new(imglist **ppimg, unsigned char *pixels,
   img->pixelwidth = pixelwidth;
   img->pixelheight = pixelheight;
   img->next = NULL;
-  img->refresh = true;
 
   *ppimg = img;
 
@@ -47,7 +46,7 @@ winimg_lazyinit(imglist *img)
   unsigned char *pixels;
   HDC dc;
   size_t size;
- 
+
   if (img->hdc)
     return;
 
@@ -188,26 +187,23 @@ winimg_paint(void)
       } else {
         // create DC handle if it is not initialized, or resume from hibernate
         winimg_lazyinit(img);
-        if (!img->refresh) {
-          for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
-            for (x = left; x < min(left + img->width, term.cols); ++x) {
-              tchar = &term.lines[y]->chars[x];
-              dchar = &term.displines[y]->chars[x];
-              update_flag = false;
-              if (term.disptop >= 0 && !(tchar->attr.attr & TATTR_SIXEL)) {
-                update_flag = true;
-                tchar->attr.attr |= TATTR_SIXEL;
-              }
-              if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
-                update_flag = true;
-              if (update_flag)
-                BitBlt(img->hdc, (x - left) * cell_width, (y - top) * cell_height,
-                       cell_width, cell_height,
-                       dc, x * cell_width + PADDING, y * cell_height + PADDING, SRCCOPY);
-            }
+        for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
+          for (x = left; x < min(left + img->width, term.cols); ++x) {
+            tchar = &term.lines[y]->chars[x];
+            dchar = &term.displines[y]->chars[x];
+            // if sixel image is overwirtten by characters, exclude the area from the clipping rect.
+            update_flag = false;
+            if (dchar->chr != ' ') {
+              update_flag = true;
+              tchar->attr.attr |= TATTR_SIXEL;
+            } else
+              dchar->attr.attr |= ATTR_INVALID;
+            if (tchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
+              update_flag = true;
+            if (update_flag)
+              ExcludeClipRect(dc, x * cell_width, y * cell_height, (x + 1) * cell_width, (y + 1) * cell_height);
           }
         }
-        img->refresh = false;
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
                    img->width * cell_width, img->height * cell_height, img->hdc,
                    0, 0, img->pixelwidth, img->pixelheight, SRCCOPY);
