@@ -277,8 +277,6 @@ typedef struct {
 
 typedef struct _imglist {
   unsigned char *pixels;
-  unsigned char *palette;
-  int ncolors;
   void *hdc;
   void *hbmp;
   void *fp;
@@ -288,7 +286,6 @@ typedef struct _imglist {
   int height;
   int pixelwidth;
   int pixelheight;
-  bool refresh;
   struct _imglist *next;
 } imglist;
 
