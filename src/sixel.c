@@ -620,5 +620,6 @@ sixel_parser_get_buffer(sixel_state_t *st)
 void
 sixel_parser_deinit(sixel_state_t *st)
 {
-  sixel_image_deinit(&st->image);
+  if (st)
+    sixel_image_deinit(&st->image);
 }
