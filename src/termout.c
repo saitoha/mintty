@@ -1128,15 +1128,15 @@ do_dcs(void)
       p += sprintf(p, "m\e\\");  // m for SGR, followed by ST
 
       child_write(buf, p - buf);
+    } else if (!strcmp(s, "r")) {  // DECSTBM (scroll margins)
+      child_printf("\eP1$r%u;%ur\e\\", term.marg_top + 1, term.marg_bot + 1);
+    } else if (!strcmp(s, "\"p")) {  // DECSCL (conformance level)
+      child_write("\eP1$r61\"p\e\\", 11);  // report as VT100
+    } else if (!strcmp(s, "\"q")) {  // DECSCA (protection attribute)
+      child_printf("\eP1$r%u\"q\e\\", (attr.attr & ATTR_PROTECTED) != 0);
+    } else {
+      child_write((char[]){CTRL('X')}, 1);
     }
-  when 'r':  // DECSTBM (scroll margins)
-    child_printf("\eP1$r%u;%ur\e\\", term.marg_top + 1, term.marg_bot + 1);
-  when CPAIR('"', 'p'):  // DECSCL (conformance level)
-    child_write("\eP1$r61\"p\e\\", 11);  // report as VT100
-  when CPAIR('"', 'q'):  // DECSCA (protection attribute)
-    child_printf("\eP1$r%u\"q\e\\", (attr.attr & ATTR_PROTECTED) != 0);
-  otherwise:
-    child_write((char[]){CTRL('X')}, 1);
   }
 }
 
