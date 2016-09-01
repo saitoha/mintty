@@ -188,20 +188,24 @@ winimg_paint(void)
         // create DC handle if it is not initialized, or resume from hibernate
         winimg_lazyinit(img);
         for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
+          int wide_factor = term.displines[y]->attr == LATTR_NORM ? 1: 2;
           for (x = left; x < min(left + img->width, term.cols); ++x) {
             tchar = &term.lines[y]->chars[x];
             dchar = &term.displines[y]->chars[x];
-            // if sixel image is overwirtten by characters, exclude the area from the clipping rect.
+            // if sixel image is overwirtten by characters,
+            // exclude the area from the clipping rect.
+            (void)(tchar);
             update_flag = false;
-            if (dchar->chr != ' ') {
+            if (dchar->chr != ' ')
               update_flag = true;
-              tchar->attr.attr |= TATTR_SIXEL;
-            } else
-              dchar->attr.attr |= ATTR_INVALID;
-            if (tchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
+            else
+              dchar->attr.attr |= TATTR_SIXEL;
+            if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
               update_flag = true;
             if (update_flag)
-              ExcludeClipRect(dc, x * cell_width, y * cell_height, (x + 1) * cell_width, (y + 1) * cell_height);
+              ExcludeClipRect(dc, x * wide_factor * cell_width, y * cell_height,
+                              (x + 1) * wide_factor * cell_width + 1,
+                              (y + 1) * cell_height + 1);
           }
         }
         StretchBlt(dc, left * cell_width + PADDING, top * cell_height + PADDING,
