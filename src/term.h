@@ -275,11 +275,22 @@ typedef struct {
   uchar oem_acs;
 } term_cursor;
 
+typedef struct {
+  void *fp;
+  uint ref_counter;
+  uint amount;
+} tempfile_t;
+
+typedef struct {
+  tempfile_t *tempfile;
+  size_t position;
+} temp_strage_t;
+
 typedef struct _imglist {
   unsigned char *pixels;
   void *hdc;
   void *hbmp;
-  void *fp;
+  temp_strage_t *strage;
   int top;
   int left;
   int width;

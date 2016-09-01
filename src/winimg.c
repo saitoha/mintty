@@ -11,6 +11,153 @@
 #include "winpriv.h"
 #include "winimg.h"
 
+// tempfile_t manipulation
+
+static tempfile_t *
+tempfile_new(void)
+{
+  tempfile_t *tempfile;
+  FILE *fp;
+
+  fp = tmpfile();
+  if (!fp)
+    return NULL;
+
+  tempfile = malloc(sizeof(tempfile_t));
+  if (!tempfile)
+    return NULL;
+
+  tempfile->fp = fp;
+  tempfile->ref_counter = 1;
+
+  return tempfile;
+}
+
+static void
+tempfile_destroy(tempfile_t *tempfile)
+{
+  fclose(tempfile->fp);
+  free(tempfile);
+}
+
+static void
+tempfile_ref(tempfile_t *tempfile)
+{
+  tempfile->ref_counter++;
+}
+
+static void
+tempfile_deref(tempfile_t *tempfile)
+{
+  if (--tempfile->ref_counter == 0)
+    tempfile_destroy(tempfile);
+}
+
+static size_t
+tempfile_size(tempfile_t *tempfile)
+{
+  fpos_t fsize = 0;
+
+  fseek(tempfile->fp, 0L, SEEK_END);
+  fgetpos(tempfile->fp, &fsize);
+
+  return (size_t)fsize;
+}
+
+static tempfile_t *
+tempfile_get(void)
+{
+  static tempfile_t *current = NULL;
+  size_t size;
+
+  if (!current) {
+    current = tempfile_new();
+    return current;
+  }
+
+  /* get file size */
+  size = tempfile_size(current);
+
+  /* if the file size reaches 16MB, return new temporary file */
+  if (size > 1024 * 1024 * 16) {
+    current = tempfile_new();
+    return current;
+  }
+
+  /* increment reference counter */
+  tempfile_ref(current);
+
+  return current;
+}
+
+static bool
+tempfile_write(tempfile_t *tempfile, unsigned char *p, size_t pos, size_t size)
+{
+  size_t nbytes;
+
+  fseek((FILE *)tempfile->fp, pos, SEEK_SET);
+  nbytes = fwrite(p, 1, size, tempfile->fp);
+  if (nbytes != size)
+    return false;
+
+  return true;
+}
+
+static bool
+tempfile_read(tempfile_t *tempfile, unsigned char *p, size_t pos, size_t size)
+{
+  size_t nbytes;
+
+  fflush((FILE *)tempfile->fp);
+  fseek((FILE *)tempfile->fp, pos, SEEK_SET);
+  nbytes = fread(p, 1, size, (FILE *)tempfile->fp);
+  if (nbytes != size)
+    return false;
+
+  return true;
+}
+
+// temp_strage_t implementation
+
+static temp_strage_t *
+strage_create(void)
+{
+  temp_strage_t *strage;
+  tempfile_t *tempfile;
+
+  tempfile = tempfile_get();
+  if (!tempfile)
+    return NULL;
+
+  strage = malloc(sizeof(temp_strage_t));
+  if (!strage)
+    return NULL;
+
+  strage->tempfile = tempfile_get();
+  strage->position = tempfile_size(strage->tempfile);
+
+  return strage;
+}
+
+static void
+strage_destroy(temp_strage_t *strage)
+{
+  tempfile_deref(strage->tempfile);
+  free(strage);
+}
+
+static bool
+strage_write(temp_strage_t *strage, unsigned char *p, size_t size)
+{
+  return tempfile_write(strage->tempfile, p, strage->position, size);
+}
+
+static bool
+strage_read(temp_strage_t *strage, unsigned char *p, size_t size)
+{
+  return tempfile_read(strage->tempfile, p, strage->position, size);
+}
+
 bool
 winimg_new(imglist **ppimg, unsigned char *pixels,
            int left, int top, int width, int height,
@@ -32,6 +179,7 @@ winimg_new(imglist **ppimg, unsigned char *pixels,
   img->pixelwidth = pixelwidth;
   img->pixelheight = pixelheight;
   img->next = NULL;
+  img->strage = NULL;
 
   *ppimg = img;
 
@@ -68,10 +216,8 @@ winimg_lazyinit(imglist *img)
     free(img->pixels);
   } else {
     // resume from hibernation
-    fflush((FILE *)img->fp);
-    fseek((FILE *)img->fp, 0L, SEEK_SET);
-    fread(pixels, 1, size, (FILE *)img->fp);
-    fclose((FILE *)img->fp);
+    assert(img->strage);
+    strage_read(img->strage, pixels, size);
   }
   img->pixels = pixels;
 
@@ -82,20 +228,20 @@ winimg_lazyinit(imglist *img)
 static void
 winimg_hibernate(imglist *img)
 {
-  FILE *fp;
-  size_t nbytes;
   size_t size;
+  temp_strage_t *strage;
 
   size = img->pixelwidth * img->pixelheight * 4;
 
   if (!img->hdc)
     return;
-  fp = tmpfile();
-  if (!fp)
+
+  strage = strage_create();
+  if (!strage)
     return;
-  nbytes = fwrite(img->pixels, 1, size, fp);
-  if (nbytes != size) {
-    fclose(fp);
+
+  if (!strage_write(strage, img->pixels, size)) {
+    strage_destroy(strage);
     return;
   }
 
@@ -106,7 +252,7 @@ winimg_hibernate(imglist *img)
   img->hdc = NULL;
   img->hbmp = NULL;
 
-  img->fp = fp;
+  img->strage = strage;
 }
 
 void
@@ -118,7 +264,7 @@ winimg_destroy(imglist *img)
   } else if (img->pixels) {
     free(img->pixels);
   } else {
-    fclose((FILE *)img->fp);
+    strage_destroy(img->strage);
   }
   free(img);
 }
@@ -155,7 +301,7 @@ winimg_paint(void)
   imglist *prev = NULL;
   int left, top;
   int x, y;
-  termchar *tchar, *dchar;
+  termchar *dchar;
   bool update_flag;
   HDC dc;
   RECT rc;
@@ -190,11 +336,9 @@ winimg_paint(void)
         for (y = max(0, top); y < min(top + img->height, term.rows); ++y) {
           int wide_factor = term.displines[y]->attr == LATTR_NORM ? 1: 2;
           for (x = left; x < min(left + img->width, term.cols); ++x) {
-            tchar = &term.lines[y]->chars[x];
             dchar = &term.displines[y]->chars[x];
             // if sixel image is overwirtten by characters,
             // exclude the area from the clipping rect.
-            (void)(tchar);
             update_flag = false;
             if (dchar->chr != ' ')
               update_flag = true;
