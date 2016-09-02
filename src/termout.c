@@ -1005,7 +1005,7 @@ do_dcs(void)
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
-      term.curs.attr.attr |= ATTR_INVALID | TATTR_SIXEL;
+      term.curs.attr.attr |= ATTR_INVALID;
 
       // fill with space characters
       if (term.sixel_display) {  // sixel display mode
