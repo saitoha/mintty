@@ -13,6 +13,11 @@
 
 // tempfile_t manipulation
 
+static tempfile_t *tempfile_current = NULL;
+static size_t tempfile_num = 0;
+static size_t const TEMPFILE_MAX_SIZE = 1024 * 1024 * 16;  /* 16MB */
+static size_t const TEMPFILE_MAX_NUM = 16;
+
 static tempfile_t *
 tempfile_new(void)
 {
@@ -30,14 +35,19 @@ tempfile_new(void)
   tempfile->fp = fp;
   tempfile->ref_counter = 1;
 
+  tempfile_num++;
+
   return tempfile;
 }
 
 static void
 tempfile_destroy(tempfile_t *tempfile)
 {
+  if (tempfile == tempfile_current)
+    tempfile_current = NULL;
   fclose(tempfile->fp);
   free(tempfile);
+  tempfile_num--;
 }
 
 static void
@@ -67,27 +77,26 @@ tempfile_size(tempfile_t *tempfile)
 static tempfile_t *
 tempfile_get(void)
 {
-  static tempfile_t *current = NULL;
   size_t size;
 
-  if (!current) {
-    current = tempfile_new();
-    return current;
+  if (!tempfile_current) {
+    tempfile_current = tempfile_new();
+    return tempfile_current;
   }
 
   /* get file size */
-  size = tempfile_size(current);
+  size = tempfile_size(tempfile_current);
 
-  /* if the file size reaches 16MB, return new temporary file */
-  if (size > 1024 * 1024 * 16) {
-    current = tempfile_new();
-    return current;
+  /* if the file size reaches TEMPFILE_MAX_SIZE, return new temporary file */
+  if (size > TEMPFILE_MAX_SIZE) {
+    tempfile_current = tempfile_new();
+    return tempfile_current;
   }
 
   /* increment reference counter */
-  tempfile_ref(current);
+  tempfile_ref(tempfile_current);
 
-  return current;
+  return tempfile_current;
 }
 
 static bool
@@ -133,7 +142,7 @@ strage_create(void)
   if (!strage)
     return NULL;
 
-  strage->tempfile = tempfile_get();
+  strage->tempfile = tempfile;
   strage->position = tempfile_size(strage->tempfile);
 
   return strage;
@@ -290,8 +299,8 @@ winimgs_clear(void)
 
   term.imgs.first = NULL;
   term.imgs.last = NULL;
-  term.imgs.first = NULL;
-  term.imgs.last = NULL;
+  term.imgs.altfirst = NULL;
+  term.imgs.altlast = NULL;
 }
 
 void
@@ -305,6 +314,13 @@ winimg_paint(void)
   bool update_flag;
   HDC dc;
   RECT rc;
+
+  /* free disk space if number of tempfile exceeds TEMPFILE_MAX_NUM */
+  while (tempfile_num > TEMPFILE_MAX_NUM && term.imgs.first) {
+    img = term.imgs.first;
+    term.imgs.first = term.imgs.first->next;
+    winimg_destroy(img);
+  }
 
   dc = GetDC(wnd);
 
@@ -343,7 +359,7 @@ winimg_paint(void)
             if (dchar->chr != ' ')
               update_flag = true;
             else
-              dchar->attr.attr |= TATTR_SIXEL;
+              dchar->attr.attr |= ATTR_INVALID;
             if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
               update_flag = true;
             if (update_flag)
