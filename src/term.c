@@ -473,7 +473,6 @@ term_clear_search(void)
 static void
 scrollback_push(uchar *line)
 {
-  term.virtuallines++;
   if (term.sblines == term.sblen) {
     // Need to make space for the new line.
     if (term.sblen < cfg.scrollback_lines) {
@@ -579,6 +578,7 @@ term_resize(int newrows, int newcols)
     for (int i = 0; i < store; i++) {
       termline *line = lines[i];
       scrollback_push(compressline(line));
+      term.virtuallines++;
       freeline(line);
     }
 
@@ -801,6 +801,8 @@ term_do_scroll(int topline, int botline, int lines, bool sb)
   }
   else {
     int seltop = topline;
+
+    term.virtuallines += lines;
 
     // Only push lines into the scrollback when scrolling off the top of the
     // normal screen and scrollback is actually enabled.
