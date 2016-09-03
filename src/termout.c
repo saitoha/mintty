@@ -1085,57 +1085,62 @@ do_dcs(void)
     }
 
   when CPAIR('$', 'q'):
-    if (!strcmp(s, "m")) { // SGR
-      char buf[64], *p = buf;
-      p += sprintf(p, "\eP1$r0");
+    switch (term.state) {
+    when DCS_ESCAPE:
+      if (!strcmp(s, "m")) { // SGR
+        char buf[64], *p = buf;
+        p += sprintf(p, "\eP1$r0");
 
-      if (attr.attr & ATTR_BOLD)
-        p += sprintf(p, ";1");
-      if (attr.attr & ATTR_DIM)
-        p += sprintf(p, ";2");
-      if (attr.attr & ATTR_ITALIC)
-        p += sprintf(p, ";3");
-      if (attr.attr & ATTR_UNDER)
-        p += sprintf(p, ";4");
-      if (attr.attr & ATTR_BLINK)
-        p += sprintf(p, ";5");
-      if (attr.attr & ATTR_REVERSE)
-        p += sprintf(p, ";7");
-      if (attr.attr & ATTR_INVISIBLE)
-        p += sprintf(p, ";8");
-      if (attr.attr & ATTR_STRIKEOUT)
-        p += sprintf(p, ";9");
+        if (attr.attr & ATTR_BOLD)
+          p += sprintf(p, ";1");
+        if (attr.attr & ATTR_DIM)
+          p += sprintf(p, ";2");
+        if (attr.attr & ATTR_ITALIC)
+          p += sprintf(p, ";3");
+        if (attr.attr & ATTR_UNDER)
+          p += sprintf(p, ";4");
+        if (attr.attr & ATTR_BLINK)
+          p += sprintf(p, ";5");
+        if (attr.attr & ATTR_REVERSE)
+          p += sprintf(p, ";7");
+        if (attr.attr & ATTR_INVISIBLE)
+          p += sprintf(p, ";8");
+        if (attr.attr & ATTR_STRIKEOUT)
+          p += sprintf(p, ";9");
 
-      if (term.curs.oem_acs)
-        p += sprintf(p, ";%u", 10 + term.curs.oem_acs);
+        if (term.curs.oem_acs)
+          p += sprintf(p, ";%u", 10 + term.curs.oem_acs);
 
-      uint fg = (attr.attr & ATTR_FGMASK) >> ATTR_FGSHIFT;
-      if (fg != FG_COLOUR_I) {
-        if (fg < 16)
-          p += sprintf(p, ";%u", (fg < 8 ? 30 : 90) + (fg & 7));
-        else
-          p += sprintf(p, ";38;5;%u", fg);
+        uint fg = (attr.attr & ATTR_FGMASK) >> ATTR_FGSHIFT;
+        if (fg != FG_COLOUR_I) {
+          if (fg < 16)
+            p += sprintf(p, ";%u", (fg < 8 ? 30 : 90) + (fg & 7));
+          else
+            p += sprintf(p, ";38;5;%u", fg);
+        }
+
+        uint bg = (attr.attr & ATTR_BGMASK) >> ATTR_BGSHIFT;
+        if (bg != BG_COLOUR_I) {
+          if (bg < 16)
+            p += sprintf(p, ";%u", (bg < 8 ? 40 : 100) + (bg & 7));
+          else
+            p += sprintf(p, ";48;5;%u", bg);
+        }
+
+        p += sprintf(p, "m\e\\");  // m for SGR, followed by ST
+
+        child_write(buf, p - buf);
+      } else if (!strcmp(s, "r")) {  // DECSTBM (scroll margins)
+        child_printf("\eP1$r%u;%ur\e\\", term.marg_top + 1, term.marg_bot + 1);
+      } else if (!strcmp(s, "\"p")) {  // DECSCL (conformance level)
+        child_write("\eP1$r61\"p\e\\", 11);  // report as VT100
+      } else if (!strcmp(s, "\"q")) {  // DECSCA (protection attribute)
+        child_printf("\eP1$r%u\"q\e\\", (attr.attr & ATTR_PROTECTED) != 0);
+      } else {
+        child_write((char[]){CTRL('X')}, 1);
       }
-
-      uint bg = (attr.attr & ATTR_BGMASK) >> ATTR_BGSHIFT;
-      if (bg != BG_COLOUR_I) {
-        if (bg < 16)
-          p += sprintf(p, ";%u", (bg < 8 ? 40 : 100) + (bg & 7));
-        else
-          p += sprintf(p, ";48;5;%u", bg);
-      }
-
-      p += sprintf(p, "m\e\\");  // m for SGR, followed by ST
-
-      child_write(buf, p - buf);
-    } else if (!strcmp(s, "r")) {  // DECSTBM (scroll margins)
-      child_printf("\eP1$r%u;%ur\e\\", term.marg_top + 1, term.marg_bot + 1);
-    } else if (!strcmp(s, "\"p")) {  // DECSCL (conformance level)
-      child_write("\eP1$r61\"p\e\\", 11);  // report as VT100
-    } else if (!strcmp(s, "\"q")) {  // DECSCA (protection attribute)
-      child_printf("\eP1$r%u\"q\e\\", (attr.attr & ATTR_PROTECTED) != 0);
-    } else {
-      child_write((char[]){CTRL('X')}, 1);
+    otherwise:
+      return;
     }
   }
 }
