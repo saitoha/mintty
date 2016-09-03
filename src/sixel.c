@@ -9,6 +9,7 @@
 
 #include "sixel.h"
 #include "sixel_hls.h"
+#include "winpriv.h"
 
 #define SIXEL_RGB(r, g, b) (((r) << 16) + ((g) << 8) +  (b))
 #define PALVAL(n,a,m) (((n) * (a) + ((m) / 2)) / (m))
@@ -186,7 +187,6 @@ sixel_image_deinit(sixel_image_t *image)
 int
 sixel_parser_init(sixel_state_t *st,
                   int fgcolor, int bgcolor,
-                  int grid_width, int grid_height,
                   int use_private_register)
 {
   int status = (-1);
@@ -202,8 +202,8 @@ sixel_parser_init(sixel_state_t *st,
   st->attributed_pv = 0;
   st->repeat_count = 1;
   st->color_index = 16;
-  st->grid_width = grid_width;
-  st->grid_height = grid_height;
+  st->grid_width = cell_width;
+  st->grid_height = cell_height;
   st->nparams = 0;
   st->param = 0;
 

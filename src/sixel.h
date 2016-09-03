@@ -45,8 +45,7 @@ typedef struct parser_context {
   sixel_image_t image;
 } sixel_state_t;
 
-int sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor,
-                      int grid_width, int grid_height, int use_private_register);
+int sixel_parser_init(sixel_state_t *st, int fgcolor, int bgcolor, int use_private_register);
 int sixel_parser_parse(sixel_state_t *st, unsigned char *p, int len);
 int sixel_parser_set_default_color(sixel_state_t *st);
 int sixel_parser_finalize(sixel_state_t *st);

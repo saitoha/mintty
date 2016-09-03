@@ -941,8 +941,6 @@ do_dcs(void)
   colour bg, fg;
   cattr attr = term.curs.attr;
   int status = (-1);
-  int w;
-  int h;
   int x, y;
   int x0, y0;
   int attr0;
@@ -1049,23 +1047,21 @@ do_dcs(void)
             if (img->top == cur->top && img->left == cur->left &&
                 img->width == cur->width &&
                 img->height == cur->height) {
-              winimg_lazyinit(cur);
-              memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-              winimg_destroy(img);
-              return;
+                memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
+                winimg_destroy(img);
+                return;
             }
             if (img->top >= cur->top && img->left >= cur->left &&
                 img->left + img->width <= cur->left + cur->width &&
                 img->top + img->height <= cur->top + cur->height) {
-              winimg_lazyinit(cur);
-              for (y = 0; y < img->pixelheight; ++y)
-                memcpy(cur->pixels +
-                         ((img->top - cur->top) * st->grid_height + y) * cur->pixelwidth * 4 +
-                         (img->left - cur->left) * st->grid_width * 4,
-                       img->pixels + y * img->pixelwidth * 4,
-                       img->pixelwidth * 4);
-              winimg_destroy(img);
-              return;
+                for (y = 0; y < img->pixelheight; ++y)
+                  memcpy(cur->pixels +
+                           ((img->top - cur->top) * st->grid_height + y) * cur->pixelwidth * 4 +
+                           (img->left - cur->left) * st->grid_width * 4,
+                         img->pixels + y * img->pixelwidth * 4,
+                         img->pixelwidth * 4);
+                winimg_destroy(img);
+                return;
             }
           }
         }
@@ -1074,8 +1070,6 @@ do_dcs(void)
       }
 
     otherwise:
-      win_get_pixels(&h, &w);
-
       /* parser status initialization */
       fg = win_get_colour(term.rvideo ? BG_COLOUR_I: FG_COLOUR_I);
       bg = win_get_colour(term.rvideo ? FG_COLOUR_I: BG_COLOUR_I);
@@ -1086,7 +1080,7 @@ do_dcs(void)
       status = sixel_parser_init(st,
                                  (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
                                  (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16,
-                                 w / term.cols, h / term.rows, term.private_color_registers);
+                                 term.private_color_registers);
       if (status < 0)
         return;
     }
