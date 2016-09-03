@@ -618,6 +618,9 @@ set_modes(bool state)
           term.app_escape_key = state;
         when 7728:       /* Escape sends FS (instead of ESC) */
           term.escape_sends_fs = state;
+        when 7730:       /* on: sixel scrolling moves cursor to beginning of the line
+                            off(default): sixel scrolling moves cursor to left of graphics */
+          term.sixel_scrolls_left = state;
         when 7766:       /* 'B': Show/hide scrollbar (if enabled in config) */
           if (state != term.show_scrollbar) {
             term.show_scrollbar = state;
@@ -633,7 +636,7 @@ set_modes(bool state)
         when 7787:       /* 'W': Application mousewheel mode */
           term.app_wheel = state;
         when 8452:       /* on: sixel scrolling leaves cursor to right of graphic
-                            off: sixel scrolling moves cursor to beginning of line */
+                            off(default): the position after sixel depends on sixel_scrolls_left */
           term.sixel_scrolls_right = state;
         /* Application control key modes */
         when 77000 ... 77031: {
@@ -1027,7 +1030,7 @@ do_dcs(void)
           if (i == img->height - 1) {  // in the last line
             if (!term.sixel_scrolls_right) {
               write_linefeed();
-              term.curs.x = x0;
+              term.curs.x = term.sixel_scrolls_left ? 0: x0;
             }
           } else {
             write_linefeed();

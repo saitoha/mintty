@@ -370,8 +370,10 @@ struct term {
   bool show_scrollbar;
 
   bool sixel_display;  // true if sixel scrolling mode is off
-  bool sixel_scrolls_right;  // on:  sixel scrolling leaves cursor to right of graphic
-                             // off: sixel scrolling moves cursor to beginning of line */
+  bool sixel_scrolls_right;  // on: sixel scrolling leaves cursor to right of graphic
+                             // off(default): the position after sixel depends on sixel_scrolls_left
+  bool sixel_scrolls_left;   // on: sixel scrolling moves cursor to beginning of the line
+                             // off(default): sixel scrolling moves cursor to left of graphics
   int  cursor_type;
   int  cursor_blinks;
   bool cursor_invalid;
