@@ -1077,12 +1077,14 @@ do_dcs(void)
       /* parser status initialization */
       fg = win_get_colour(term.rvideo ? BG_COLOUR_I: FG_COLOUR_I);
       bg = win_get_colour(term.rvideo ? FG_COLOUR_I: BG_COLOUR_I);
-      if (!st)
+      if (!st) {
         st = term.imgs.parser_state = calloc(1, sizeof(sixel_state_t));
+        sixel_parser_set_default_color(st);
+      }
       status = sixel_parser_init(st,
                                  (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
                                  (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16,
-                                 w / term.cols, h / term.rows);
+                                 w / term.cols, h / term.rows, term.private_color_registers);
       if (status < 0)
         return;
     }

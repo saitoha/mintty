@@ -74,7 +74,8 @@ sixel_image_init(
   int              width,
   int              height,
   int              fgcolor,
-  int              bgcolor)
+  int              bgcolor,
+  int              use_private_register)
 {
   int status = (-1);
   size_t size;
@@ -84,6 +85,7 @@ sixel_image_init(
   image->height = height;
   image->data = (unsigned char *)malloc(size);
   image->ncolors = 2;
+  image->use_private_register = use_private_register;
 
   if (image->data == NULL) {
     status = (-1);
@@ -92,7 +94,10 @@ sixel_image_init(
   memset(image->data, 0, size);
 
   image->palette[0] = bgcolor;
-  image->palette[1] = fgcolor;
+
+  if (image->use_private_register)
+    image->palette[1] = fgcolor;
+
   image->palette_modified = 0;
 
   status = (0);
@@ -181,7 +186,8 @@ sixel_image_deinit(sixel_image_t *image)
 int
 sixel_parser_init(sixel_state_t *st,
                   int fgcolor, int bgcolor,
-                  int grid_width, int grid_height)
+                  int grid_width, int grid_height,
+                  int use_private_register)
 {
   int status = (-1);
 
@@ -202,9 +208,15 @@ sixel_parser_init(sixel_state_t *st,
   st->param = 0;
 
   /* buffer initialization */
-  status = sixel_image_init(&st->image, 1, 1, fgcolor, bgcolor);
+  status = sixel_image_init(&st->image, 1, 1, fgcolor, bgcolor, use_private_register);
 
   return status;
+}
+
+int
+sixel_parser_set_default_color(sixel_state_t *st)
+{
+  return set_default_color(&st->image);
 }
 
 int
@@ -236,7 +248,7 @@ sixel_parser_finalize(sixel_state_t *st)
     }
   }
 
-  if (image->ncolors > 2 && !image->palette_modified) {
+  if (image->use_private_register && image->ncolors > 2 && !image->palette_modified) {
     status = set_default_color(image);
     if (status < 0) {
       goto end;
