@@ -196,7 +196,7 @@ winimg_new(imglist **ppimg, unsigned char *pixels,
 }
 
 // create DC handle if it is not initialized, or resume from hibernate
-static void
+void
 winimg_lazyinit(imglist *img)
 {
   BITMAPINFO bmpinfo;

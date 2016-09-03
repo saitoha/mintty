@@ -1049,21 +1049,23 @@ do_dcs(void)
             if (img->top == cur->top && img->left == cur->left &&
                 img->width == cur->width &&
                 img->height == cur->height) {
-                memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
-                winimg_destroy(img);
-                return;
+              winimg_lazyinit(cur);
+              memcpy(cur->pixels, img->pixels, img->pixelwidth * img->pixelheight * 4);
+              winimg_destroy(img);
+              return;
             }
             if (img->top >= cur->top && img->left >= cur->left &&
                 img->left + img->width <= cur->left + cur->width &&
                 img->top + img->height <= cur->top + cur->height) {
-                for (y = 0; y < img->pixelheight; ++y)
-                  memcpy(cur->pixels +
-                           ((img->top - cur->top) * st->grid_height + y) * cur->pixelwidth * 4 +
-                           (img->left - cur->left) * st->grid_width * 4,
-                         img->pixels + y * img->pixelwidth * 4,
-                         img->pixelwidth * 4);
-                winimg_destroy(img);
-                return;
+              winimg_lazyinit(cur);
+              for (y = 0; y < img->pixelheight; ++y)
+                memcpy(cur->pixels +
+                         ((img->top - cur->top) * st->grid_height + y) * cur->pixelwidth * 4 +
+                         (img->left - cur->left) * st->grid_width * 4,
+                       img->pixels + y * img->pixelwidth * 4,
+                       img->pixelwidth * 4);
+              winimg_destroy(img);
+              return;
             }
           }
         }
