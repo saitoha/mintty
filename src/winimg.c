@@ -9,6 +9,7 @@
 
 #include "term.h"
 #include "winpriv.h"
+#include "termpriv.h"
 #include "winimg.h"
 
 // tempfile_t manipulation
@@ -312,6 +313,7 @@ winimg_paint(void)
   int x, y;
   termchar *dchar;
   bool update_flag;
+  bool selected;
   HDC dc;
   RECT rc;
 
@@ -353,17 +355,34 @@ winimg_paint(void)
           int wide_factor = term.displines[y]->attr == LATTR_NORM ? 1: 2;
           for (x = left; x < min(left + img->width, term.cols); ++x) {
             dchar = &term.displines[y]->chars[x];
+
             // if sixel image is overwirtten by characters,
             // exclude the area from the clipping rect.
             update_flag = false;
+            selected = false;
             if (dchar->chr != ' ')
               update_flag = true;
             else
               dchar->attr.attr |= ATTR_INVALID;
             if (dchar->attr.attr & (TATTR_RESULT| TATTR_CURRESULT))
               update_flag = true;
-            if (update_flag)
-              ExcludeClipRect(dc, x * wide_factor * cell_width, y * cell_height,
+            if (term.selected && !update_flag) {
+	      pos scrpos = {y + term.disptop, x};
+              selected = term.sel_rect
+                  ? posPle(term.sel_start, scrpos) && posPlt(scrpos, term.sel_end)
+                  : posle(term.sel_start, scrpos) && poslt(scrpos, term.sel_end);
+              if (selected) {
+                RECT rc = {x * wide_factor * cell_width + PADDING,
+                           y * cell_height + PADDING,
+                           (x + 1) * wide_factor * cell_width + 1,
+                           (y + 1) * cell_height + 1};
+                FillRect(dc, &rc, WHITE_BRUSH);
+              }
+            }
+            if (update_flag || selected)
+              ExcludeClipRect(dc,
+                              x * wide_factor * cell_width + PADDING,
+                              y * cell_height + PADDING,
                               (x + 1) * wide_factor * cell_width + 1,
                               (y + 1) * cell_height + 1);
           }
