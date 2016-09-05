@@ -646,8 +646,6 @@ win_paint(void)
   EndPaint(wnd, &p);
 }
 
-
-
 static void
 do_update(void)
 {

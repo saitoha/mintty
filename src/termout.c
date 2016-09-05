@@ -1006,7 +1006,6 @@ do_dcs(void)
 
       x0 = term.curs.x;
       attr0 = term.curs.attr.attr;
-      term.curs.attr.attr |= ATTR_INVALID;
 
       // fill with space characters
       if (term.sixel_display) {  // sixel display mode
@@ -1016,7 +1015,7 @@ do_dcs(void)
           term.curs.y = y;
           term.curs.x = 0;
           for (x = x0; x < x0 + img->width && x < term.cols; ++x)
-            write_char(0x20, 1);
+            write_char(SIXELCH, 1);
         }
         term.curs.y = y0;
         term.curs.x = x0;
@@ -1024,7 +1023,7 @@ do_dcs(void)
         for (i = 0; i < img->height; ++i) {
           term.curs.x = x0;
           for (x = x0; x < x0 + img->width && x < term.cols; ++x)
-            write_char(0x20, 1);
+            write_char(SIXELCH, 1);
           if (i == img->height - 1) {  // in the last line
             if (!term.sixel_scrolls_right) {
               write_linefeed();

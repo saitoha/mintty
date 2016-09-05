@@ -58,12 +58,14 @@ typedef enum {
 } colour_i;
 
 
-/*
+/* Special Characters:
  * UCSWIDE is a special value used in the terminal data to signify
  * the character cell containing the right-hand half of a CJK wide
  * character.
+ * SIXELCH is a special character which represents a part of SIXEL graphics.
  */
-enum { UCSWIDE = 0 };
+enum { UCSWIDE = 0,
+       SIXELCH = 1 };
 
 /* Three character attribute types:
  * The ATTRs (normal attributes) are stored with the characters in
