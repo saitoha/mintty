@@ -412,10 +412,12 @@ struct term {
   // Mouse mode
   enum {
     MM_NONE,
-    MM_X10,       // just clicks
-    MM_VT200,     // click and release
-    MM_BTN_EVENT, // click, release, and drag with button down
-    MM_ANY_EVENT  // click, release, and any movement
+    MM_X10,             // just clicks
+    MM_VT200,           // click and release
+    MM_BTN_EVENT,       // click, release, and drag with button down
+    MM_ANY_EVENT,       // click, release, and any movement
+    MM_LOCATOR,         // DEC locator events
+    MM_LOCATOR_ONESHOT  // DEC locator events (one shot)
   } mouse_mode;
 
   // Mouse encoding
@@ -431,6 +433,8 @@ struct term {
     MS_SEL_CHAR = -1, MS_SEL_WORD = -2, MS_SEL_LINE = -3,
     MS_COPYING = -4, MS_PASTING = -5, MS_OPENING = -6
   } mouse_state;
+
+  bool locator_by_pixels;
 
   bool sel_rect, selected;
   pos sel_start, sel_end, sel_anchor;

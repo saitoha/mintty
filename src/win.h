@@ -54,6 +54,7 @@ void win_get_pos(int *xp, int *yp);
 void win_get_pixels(int *height_p, int *width_p);
 void win_get_screen_chars(int *rows_p, int *cols_p);
 void win_popup_menu(void);
+void win_get_locator_info(int *xp, int *yp, int *button, bool by_pixels);
 
 void win_zoom_font(int, bool sync_size_with_font);
 void win_set_font_size(int, bool sync_size_with_font);

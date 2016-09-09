@@ -21,8 +21,8 @@
 #define CPAIR(x, y) ((x) << 8 | (y))
 
 static string primary_da1 = "\e[?1;2c";
-static string primary_da2 = "\e[?62;1;2;4;6;22c";
-static string primary_da3 = "\e[?63;1;2;4;6;22c";
+static string primary_da2 = "\e[?62;1;2;4;6;22;29c";
+static string primary_da3 = "\e[?63;1;2;4;6;22;29c";
 
 /*
  * Move the cursor to a given position, clipping at boundaries. We
@@ -946,6 +946,39 @@ do_csi(uchar c)
         when 0 or 2: term.curs.attr.attr &= ~ATTR_PROTECTED;
         when 1: term.curs.attr.attr |= ATTR_PROTECTED;
       }
+    when CPAIR('?', 'n'):  /* DECDSR: device status report, DEC specific */
+      switch (arg0) {
+      when 53:
+        child_printf("\e[?50n");
+      when 55:
+        child_printf("\e[?50n");
+      when 56:
+        child_printf("\e[?57;1n");
+      }
+    when CPAIR('\'', 'z'): {  /* DECELR: enable locator reporting */
+      switch (arg0) {
+      when 0:
+        term.mouse_mode = 0;
+        win_update_mouse();
+      when 1:
+        term.mouse_mode = MM_LOCATOR;
+        win_update_mouse();
+      when 2:
+        term.mouse_mode = MM_LOCATOR_ONESHOT;
+        win_update_mouse();
+      }
+      switch (arg0) {
+      when 0 or 2:
+        term.locator_by_pixels = false;
+      when 1:
+        term.locator_by_pixels = true;
+      }
+    }
+    when CPAIR('\'', '|'): {  /* DECRQLP: request locator position */
+      int x, y, button;
+      win_get_locator_info(&x, &y, &button, term.locator_by_pixels);
+      child_printf("\e[1;%d;%d;%d&w", button, y, x);
+    }
   }
 }
 

@@ -228,6 +228,9 @@ send_mouse_event(mouse_action a, mouse_button b, mod_keys mods, pos p)
 {
   uint x = p.x + 1, y = p.y + 1;
 
+  if (term.mouse_mode == MM_LOCATOR || term.mouse_mode == MM_LOCATOR_ONESHOT) {
+    return;
+  }
   uint code = b ? b - 1 : 0x3;
 
   if (a != MA_RELEASE)
