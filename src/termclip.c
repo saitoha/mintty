@@ -65,13 +65,13 @@ get_selection(clip_workbuf *buf)
     nlpos.x = term.cols;
 
    /*
-    * ... move it backwards if there's unused space at the end
-    * of the line (and also set `nl' if this is the case,
-    * because in normal selection mode this means we need a
-    * newline at the end)...
+    * ... move it backwards if there's unused space or special
+    * character(SIXELCH) at the end of the line (and also set
+    * `nl' if this is the case, because in normal selection
+    * mode this means we need a newline at the end)...
     */
     if (!(line->attr & LATTR_WRAPPED)) {
-      while (nlpos.x && line->chars[nlpos.x - 1].chr == ' ' &&
+      while (nlpos.x && line->chars[nlpos.x - 1].chr <= ' ' &&
              !line->chars[nlpos.x - 1].cc_next && poslt(start, nlpos))
         decpos(nlpos);
       if (poslt(nlpos, end))
@@ -106,6 +106,9 @@ get_selection(clip_workbuf *buf)
 
       while (1) {
         wchar c = line->chars[x].chr;
+        /* SIXELCH is treated as a space character */
+        if (c == SIXELCH)
+          c = ' ';
         attr = line->chars[x].attr.attr;
         cbuf[0] = c;
         cbuf[1] = 0;
