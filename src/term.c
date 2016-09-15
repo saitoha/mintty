@@ -118,6 +118,11 @@ term_cursor_reset(term_cursor *curs)
 void
 term_reset(void)
 {
+  if (term.cmd_buf == NULL) {
+    term.cmd_buf = newn(char, 128);
+    term.cmd_buf_cap = 128;
+  }
+
   term.state = NORMAL;
 
   term_cursor_reset(&term.curs);
@@ -1163,7 +1168,12 @@ term_paint(void)
         !termchars_equal_override(&dispchars[j], d, tchar, tattr);
       dirty_run |= do_copy;
 
-      text[textlen++] = tchar;
+      if (tchar == SIXELCH)
+        // indicate visually that the image will not be copied
+        text[textlen++] = 0xFFFD;
+      else
+        text[textlen++] = tchar;
+
       if (!has_rtl)
         has_rtl = is_rtl_class(tbc);
 

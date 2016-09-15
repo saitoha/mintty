@@ -1,3 +1,8 @@
+  * Retaining config file comments (#574).
+  * Enabling auto-scaling of window decoration (#547, #517, thanks to Jason Mansour #588).
+  * Option AllowSetSelection to enable OSC 52 control sequence to set clipboard for pasting (#258, thanks to kangjianbin).
+  * Tweaks for Sixel graphics feature.
+
 ### 2.6.0 (8 Sep 2016) ###
 
   * Sixel graphics support (#572, thanks to Hayaki Saito).
@@ -260,7 +265,7 @@ Zooming:
   * New option ZoomMouse=off to disable mouse-wheel zooming.
   * Enabled Shift+Ctrl+0 to reset zooming for font and window (#233).
 
-Fixes̈:
+Fixes:
   * Fixed crash after conditional daemonizing (#464, #465).
   * Apply daemonizing for cloned window (Alt+F2) to avoid zombie process (thanks to Paul Townsend).
   * Made conditional daemonizing the default again.

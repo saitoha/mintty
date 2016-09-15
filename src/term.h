@@ -65,7 +65,8 @@ typedef enum {
  * SIXELCH is a special character which represents a part of SIXEL graphics.
  */
 enum { UCSWIDE = 0,
-       SIXELCH = 1 };
+       SIXELCH = 0xFFFC
+};
 
 /* Three character attribute types:
  * The ATTRs (normal attributes) are stored with the characters in
@@ -389,7 +390,8 @@ struct term {
   uint csi_argv_defined[32];
 
   int  cmd_num;        // OSC command number, or -1 for DCS
-  char cmd_buf[2048];  // OSC or DCS string buffer and length
+  char *cmd_buf;       // OSC or DCS string buffer and length
+  uint cmd_buf_cap;
   uint cmd_len;
   int dcs_cmd;
 
