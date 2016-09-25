@@ -56,7 +56,9 @@ in the manual page.
 
 ## Using mintty for Bash on Ubuntu on Windows (UoW) / Windows Subsystem for Linux (WSL) ##
 
-For users of cygwin or msys2:
+Install [wsltty](https://github.com/mintty/wsltty).
+
+Or, to help reproduce the installation manually, for users of cygwin or msys2:
 * From https://github.com/rprichard/wslbridge/releases, download the `wslbridge` archive corresponding to your system (cygwin/msys2 32/64 bit)
 * Install `wslbridge.exe` and `wslbridge-backend` into your cygwin or msys2 `/bin` directory
 * Make a desktop shortcut (Desktop right-click – New ▸ Shortcut) with 
@@ -80,6 +82,18 @@ start mintty -
 The console window for the batch file will still show up briefly, however. This can be avoided by invoking mintty from a shortcut instead, as described above.
 
 
+## Starting in a particular directory ##
+
+The working directory for a mintty session can be set in the _Start In_ field of a shortcut, 
+or by changing directory in an invoking script, or with option `--dir`.
+Note, however, that Cygwin's _/etc/profile_ script for login shells automatically changes to the user's home directory.
+The profile script can be told not to do this by setting a variable called _CHERE\_INVOKING_, like this:
+
+```
+mintty /bin/env CHERE_INVOKING=1 /bin/bash -l
+```
+
+
 ## Creating a folder context menu entry for mintty ##
 
 Cygwin's **chere** package can be used to create folder context menu entries in Explorer, which allow a shell to be opened with the working directory set to the selected folder.
@@ -88,6 +102,14 @@ The following command will create an entry called _Bash Prompt Here_ for the cur
 
 ```
 chere -i -c -t mintty
+```
+
+Note, however, that context menu entries created by **chere** fail on non-ASCII directory names.
+Mintty option `--dir` comes to help, like in either of these registry entries 
+for registry keys like `/HKCU/Software/Classes/Directory/Shell/mintty-here/command/`:
+```
+C:\cygwin64\bin\mintty.exe --dir "%1" /bin/bash
+C:\cygwin64\bin\mintty.exe --dir "%1" /bin/env CHERE_INVOKING=1 /bin/bash -l
 ```
 
 
@@ -104,13 +126,24 @@ mintty /bin/env DISPLAY=:0 /bin/ssh -X server
 ```
 
 
-## Starting in a particular directory ##
+## Input/Output interaction with alien programs ##
 
-The working directory for a mintty session can be set in the _Start In_ field of a shortcut, or by changing directory in an invoking script. Note, however, that Cygwin's _/etc/profile_ script for login shells automatically changes to the user's home directory. The profile script can be told not to do this by setting a variable called _CHERE\_INVOKING_, like this:
+When interacting with programs that use a native Windows API for 
+command-line user interaction (“console mode”), a number of undesirable 
+effects are observed; this is the 
+[pty incompatibility problem](https://github.com/mintty/mintty/issues/56) 
+and the 
+[character encoding incompatibility problem](https://github.com/mintty/mintty/issues/376).
+This basically affects all programs not compiled in a cygwin or msys 
+environment (and note that MinGW is not msys in this context).
 
-```
-mintty /bin/env CHERE_INVOKING=1 /bin/bash -l
-```
+As a workaround, you can use [winpty](https://github.com/rprichard/winpty) 
+as a wrapper to invoke the Windows program.
+
+_Note:_ There is no point in reporting this for the 15th time as a mintty 
+issue, because it is not a mintty issue (or well, an issue maybe, but not 
+caused by, or fixable by, mintty); it is a generic problem of cygwin/msys 
+and occurs likewise in all other pty-based terminals (e.g. xterm).
 
 
 ## Terminal line settings ##
@@ -436,7 +469,8 @@ PROMPT_COMMAND='echo -ne "\e]7;$PWD\a" ; '"$PROMPT_COMMAND"
 ```
 
 The sequence could also be output by shell aliases or functions changing the directory.
-It cannot be embedded in the prompt itself with ```\w``` as that is using some shortcuts.
+It cannot be embedded in the prompt itself with ```\w``` as that is using some shortcuts, 
+but ```$PWD``` could be used if ```shopt promptvars``` is not unset.
 
 Note that after remote login, the directory path may be meaningless 
 unless the remote and local paths match.
@@ -455,6 +489,23 @@ to navigate the monitor grid to the desired target monitor, then release F2.
 
 Note also the generic Windows hotkeys to move the current window to 
 the left or right neighbour monitor: Win+Shift+cursor-left/right.
+
+
+## Embedding graphics in terminal output ##
+
+The new support of the SIXEL feature facilitates a range of applications 
+that integrate graphic images in the terminal, animated graphics, and even 
+video and interactive gaming applications.
+
+An example of the benefit of this feature is the output of `gnuplot` 
+with the command
+```
+export GNUTERM=sixel
+gnuplot -e "splot [x=-3:3] [y=-3:3] sin(x) * cos(y)"
+```
+
+Note that gnuplot uses black text on default background for captions 
+and coordinates so better not run it in a terminal with dark background.
 
 
 ## Running mintty stand-alone ##

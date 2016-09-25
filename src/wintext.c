@@ -5,7 +5,7 @@
 
 #include "winpriv.h"
 #include "winsearch.h"
-#include "charset.h"  // wcscpy
+#include "charset.h"  // wcscpy, combiningdouble
 
 #include "minibidi.h"
 #include "winimg.h"
@@ -464,6 +464,16 @@ win_init_fonts(int size)
   font_ambig_wide =
     greek_char_width >= latin_char_width * 1.5 ||
     line_char_width  >= latin_char_width * 1.5;
+#ifdef debug_win_char_width
+  int w_latin = win_char_width(0x0041);
+  int w_greek = win_char_width(0x03B1);
+  int w_lines = win_char_width(0x2500);
+  printf("%04X %5.2f %d\n", 0x0041, latin_char_width, w_latin);
+  printf("%04X %5.2f %d\n", 0x03B1, greek_char_width, w_greek);
+  printf("%04X %5.2f %d\n", 0x2500, line_char_width, w_lines);
+  bool faw = w_greek > w_latin || w_lines > w_latin;
+  printf("font ambig %d/%d (dual %d)\n", font_ambig_wide, faw, font_dualwidth);
+#endif
 
   // Initialise VT100 linedraw character mappings.
   // See what glyphs are available.
@@ -1039,11 +1049,19 @@ win_text(int x, int y, wchar *text, int len, cattr attr, int lattr, bool has_rtl
   }
 
   bool combining = attr.attr & TATTR_COMBINING;
+  bool combining_double = attr.attr & TATTR_COMBDOUBL;
+  if (combining_double)
+    combining = false;
+
   int width = char_width * (combining ? 1 : len);
   RECT box = {
     .top = y, .bottom = y + cell_height,
     .left = x, .right = min(x + width, cell_width * term.cols + PADDING)
   };
+  RECT box2 = box;
+  if (combining_double) {
+    box2.left -= char_width;
+  }
 
  /* Array with offsets between neighbouring characters */
   int dxs[len];
@@ -1071,7 +1089,7 @@ win_text(int x, int y, wchar *text, int len, cattr attr, int lattr, bool has_rtl
       text[i] = ' ';
   }
 
- /* Determine Shadow/Overstrike bold width */
+ /* Determine shadow/overstrike bold or double-width/height width */
   int xwidth = 1;
   if (apply_shadow && bold_mode == BOLD_SHADOW && (attr.attr & ATTR_BOLD)) {
     // This could be scaled with font size, but at risk of clipping
@@ -1094,7 +1112,7 @@ win_text(int x, int y, wchar *text, int len, cattr attr, int lattr, bool has_rtl
   if (let_windows_combine)
     combining = false;  // disable separate combining characters display
   for (int xoff = 0; xoff < xwidth; xoff++)
-    if (combining) {
+    if (combining || combining_double) {
       // Workaround for mangled display of combining characters;
       // Arabic shaping should not be affected as the transformed 
       // presentation forms are not combining characters anymore at this point.
@@ -1107,8 +1125,12 @@ win_text(int x, int y, wchar *text, int len, cattr attr, int lattr, bool has_rtl
         overwropt = 0;
       }
       // combining characters
-      for (int i = 1; i < len; i++)
-        ExtTextOutW(dc, xt + xoff, yt, eto_options, &box, &text[i], 1, dxs);
+      for (int i = 1; i < len; i++) {
+        int xx = xt + xoff;
+        if (combining_double && combiningdouble(text[i]))
+          xx -= char_width / 2;
+        ExtTextOutW(dc, xx, yt, eto_options, &box2, &text[i], 1, dxs);
+      }
     }
     else {
       ExtTextOutW(dc, xt + xoff, yt, eto_options | overwropt, &box, text, len, dxs);
@@ -1285,7 +1307,13 @@ win_text(int x, int y, wchar *text, int len, cattr attr, int lattr, bool has_rtl
         }
       }
       when CUR_UNDERSCORE:
-        y += min(descent, cell_height - 2);
+        y = yt + min(descent, cell_height - 2);
+        y += row_spacing * 3 / 8;
+        if (lattr >= LATTR_TOP) {
+          y += row_spacing / 2;
+          if (lattr == LATTR_BOT)
+            y += cell_height;
+        }
         if (attr.attr & TATTR_ACTCURS)
           Rectangle(dc, x, y, x + char_width, y + 2);
         else if (attr.attr & TATTR_PASCURS) {
@@ -1321,44 +1349,63 @@ win_check_glyphs(wchar *wcs, uint num)
 #define dont_debug_win_char_width
 
 /* This function gets the actual width of a character in the normal font.
-   Usage: determine whether to trim an ambiguous wide character 
-   (of a CJK ambiguous-wide font such as BatangChe) to normal width 
-   if desired.
+   Usage:
+   * determine whether to trim an ambiguous wide character 
+     (of a CJK ambiguous-wide font such as BatangChe) to normal width 
+     if desired.
+   * also whether to expand a normal width character if expected wide
  */
 int
 win_char_width(xchar c)
 {
-  int ibuf = 0;
-
- /* If the font max is the same as the font ave width then this
-  * function is a no-op.
+ /* If the font max width is the same as the font average width
+  * then this function is a no-op.
   */
+#ifndef debug_win_char_width
   if (!font_dualwidth)
     return 1;
+#endif
 
- /* Speedup, I know of no font where ascii is the wrong width */
+ /* Speedup, I know of no font where ASCII is the wrong width */
+#ifdef debug_win_char_width
+  if (c != 'A')
+#endif
   if (c >= ' ' && c < '~')  // exclude 0x7E (overline in Shift_JIS X 0213)
     return 1;
 
+  dc = GetDC(wnd);
+#ifdef debug_win_char_width
+  bool ok0 = !!
+#endif
   SelectObject(dc, fonts[FONT_NORMAL]);
+#ifdef debug_win_char_width
+  if (c == 0x2001)
+    win_char_width(0x5555);
+  if (!ok0)
+    printf("width %04X failed (dc %p)\n", c, dc);
+  else if (c >= '~' || c == 'A') {
+    int cw = 0;
+    BOOL ok1 = GetCharWidth32W(dc, c, c, &cw);  // "not on TrueType"
+    float cwf = 0.0;
+    BOOL ok2 = GetCharWidthFloatW(dc, c, c, &cwf);
+    ABC abc; memset(&abc, 0, sizeof abc);
+    BOOL ok3 = GetCharABCWidthsW(dc, c, c, &abc);  // only on TrueType
+    ABCFLOAT abcf; memset(&abcf, 0, sizeof abcf);
+    BOOL ok4 = GetCharABCWidthsFloatW(dc, c, c, &abcf);
+    printf("w %04X [%d] (32 %d) %d (32a %d) %d (flt %d) %.3f (abc %d) %2d %2d %2d (abcf %d) %4.1f %4.1f %4.1f\n", 
+           c, cell_width, ok1, cw, ok2, cwf, 
+           ok3, abc.abcA, abc.abcB, abc.abcC, 
+           ok4, abcf.abcfA, abcf.abcfB, abcf.abcfC);
+  }
+#endif
+
+  int ibuf = 0;
   if (!GetCharWidth32W(dc, c, c, &ibuf))
     return 0;
-#ifdef debug_win_char_width
-    printf("win_char_width %04X %d (cell %d)\n", c, ibuf, cell_width);
-#endif
 
   // report char as wide if its width is more than 1½ cells
   ibuf += cell_width / 2 - 1;
   ibuf /= cell_width;
-#ifdef debug_win_char_width
-  if (c >= '~') {
-    float char_width;
-    GetCharWidthFloatW(dc, c, c, &char_width);
-    ABC abc;
-    GetCharABCWidthsW(dc, c, c, &abc);
-    printf("               %04X float %d %f abc %d %d %d\n", c, ibuf, char_width, abc.abcA, abc.abcB, abc.abcC);
-  }
-#endif
 
   return ibuf;
 }

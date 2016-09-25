@@ -57,6 +57,11 @@ This is useful to mix-in partial configuration variants, particularly
 colour schemes. However, \fB-o ThemeFile=\fIFILENAME\fP may be preferable.
 
 .TP
+\fB--dir\fP \fIdirectory\fP
+Change initial directory to start in. This is especially useful for 
+invocation of mintty from a Windows context menu via registry entry.
+
+.TP
 \fB-e\fP, \fB--exec\fP \fIPROGRAM\fP [\fIARG\fP ...]
 Execute the specified program in the terminal session and pass on any additional
 arguments.
@@ -531,6 +536,17 @@ Keys pane of the options dialog.
 \(en \fBCtrl+Shift+F\fP: Full screen (not zooming font despite Shift)
 .br
 \(en \fBCtrl+Shift+S\fP: Flip screen
+
+.SS Embedding graphics in terminal output
+
+The new support of the SIXEL feature facilitates a range of applications 
+that integrate graphic images in the terminal, animated graphics, and even 
+video and interactive gaming applications.
+
+An example of the benefit of this feature is the output of `gnuplot` 
+with the command
+.br
+GNUTERM=sixel gnuplot -e "splot [x=-3:3] [y=-3:3] sin(x) * cos(y)"
 
 .SH CONFIGURATION
 
