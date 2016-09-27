@@ -1039,6 +1039,8 @@ do_dcs(void)
         return;
       }
 
+      sixel_parser_deinit(st);
+
       left = term.curs.x;
       top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       width = st->image.width / st->grid_width;
