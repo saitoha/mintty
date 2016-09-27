@@ -11,11 +11,11 @@
 #include "sixel_hls.h"
 #include "winpriv.h"
 
-#define SIXEL_RGB(r, g, b) (((r) << 16) + ((g) << 8) +  (b))
+#define SIXEL_RGB(r, g, b) ((r) + ((g) << 8) +  ((b) << 16))
 #define PALVAL(n,a,m) (((n) * (a) + ((m) / 2)) / (m))
 #define SIXEL_XRGB(r,g,b) SIXEL_RGB(PALVAL(r, 255, 100), PALVAL(g, 255, 100), PALVAL(b, 255, 100))
 
-static int32_t const sixel_default_color_table[] = {
+static colour const sixel_default_color_table[] = {
     SIXEL_XRGB(0,  0,  0),   /*  0 Black    */
     SIXEL_XRGB(20, 20, 80),  /*  1 Blue     */
     SIXEL_XRGB(80, 13, 13),  /*  2 Red      */
@@ -52,18 +52,18 @@ set_default_color(sixel_image_t *image)
   for (r = 0; r < 6; r++) {
     for (g = 0; g < 6; g++) {
       for (b = 0; b < 6; b++) {
-        image->palette[n++] = SIXEL_RGB(r * 51, g * 51, b * 51);
+        image->palette[n++] = make_colour(r * 51, g * 51, b * 51);
       }
     }
   }
 
   /* colors 233-256 are a grayscale ramp, intentionally leaving out */
   for (i = 0; i < 24; i++) {
-    image->palette[n++] = SIXEL_RGB(i * 11, i * 11, i * 11);
+    image->palette[n++] = make_colour(i * 11, i * 11, i * 11);
   }
 
   for (; n < DECSIXEL_PALETTE_MAX; n++) {
-    image->palette[n] = SIXEL_RGB(255, 255, 255);
+    image->palette[n] = make_colour(255, 255, 255);
   }
 
   return (0);
@@ -180,8 +180,8 @@ sixel_image_deinit(sixel_image_t *image)
 
 int
 sixel_parser_init(sixel_state_t *st,
-                  int32_t fgcolor, int32_t bgcolor,
-                  uint8_t use_private_register)
+                  colour fgcolor, colour bgcolor,
+                  uchar use_private_register)
 {
   int status = (-1);
 
@@ -214,7 +214,7 @@ sixel_parser_set_default_color(sixel_state_t *st)
 }
 
 int
-sixel_parser_finalize(sixel_state_t *st, uint8_t *pixels)
+sixel_parser_finalize(sixel_state_t *st, uchar *pixels)
 {
   int status = (-1);
   int sx;
@@ -222,7 +222,7 @@ sixel_parser_finalize(sixel_state_t *st, uint8_t *pixels)
   sixel_image_t *image = &st->image;
   int x, y;
   sixel_color_no_t *src;
-  uint8_t *dst;
+  uchar *dst;
   int color;
 
   if (++st->max_x < st->attributed_ph) {
@@ -255,17 +255,17 @@ sixel_parser_finalize(sixel_state_t *st, uint8_t *pixels)
   for (y = 0; y < st->image.height; ++y) {
     for (x = 0; x < st->image.width; ++x) {
       color = st->image.palette[*src++];
-      *dst++ = color >> 0 & 0xff;    /* r */
-      *dst++ = color >> 8 & 0xff;    /* g */
       *dst++ = color >> 16 & 0xff;   /* b */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 0 & 0xff;    /* r */
       dst++;                         /* a */
     }
     /* fill right padding with bgcolor */
     for (; x < st->image.width; ++x) {
       color = st->image.palette[0];  /* bgcolor */
-      *dst++ = color >> 0 & 0xff;    /* r */
-      *dst++ = color >> 8 & 0xff;    /* g */
       *dst++ = color >> 16 & 0xff;   /* b */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 0 & 0xff;    /* r */
       dst++;                         /* a */
     }
   }
@@ -273,9 +273,9 @@ sixel_parser_finalize(sixel_state_t *st, uint8_t *pixels)
   for (; y < st->image.height; ++y) {
     for (x = 0; x < st->image.width; ++x) {
       color = st->image.palette[0];  /* bgcolor */
-      *dst++ = color >> 0 & 0xff;    /* r */
-      *dst++ = color >> 8 & 0xff;    /* g */
       *dst++ = color >> 16 & 0xff;   /* b */
+      *dst++ = color >> 8 & 0xff;    /* g */
+      *dst++ = color >> 0 & 0xff;    /* r */
       dst++;                         /* a */
     }
   }
@@ -288,7 +288,7 @@ end:
 
 /* convert sixel data into indexed pixel bytes and palette data */
 int
-sixel_parser_parse(sixel_state_t *st, uint8_t *p, size_t len)
+sixel_parser_parse(sixel_state_t *st, uchar *p, size_t len)
 {
   int status = (-1);
   int n;
@@ -301,7 +301,7 @@ sixel_parser_parse(sixel_state_t *st, uint8_t *p, size_t len)
   int sy;
   int c;
   int pos;
-  uint8_t *p0 = p;
+  uchar *p0 = p;
   sixel_image_t *image = &st->image;
 
   if (!image->data)

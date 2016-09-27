@@ -1072,6 +1072,8 @@ do_dcs(void)
         return;
       }
 
+      sixel_parser_deinit(st);
+
       left = term.curs.x;
       top = term.virtuallines + (term.sixel_display ? 0: term.curs.y);
       width = st->image.width / st->grid_width;
@@ -1158,10 +1160,7 @@ do_dcs(void)
         st = term.imgs.parser_state = calloc(1, sizeof(sixel_state_t));
         sixel_parser_set_default_color(st);
       }
-      status = sixel_parser_init(st,
-                                 (fg & 0xff) << 16 | (fg & 0xff00) | (fg & 0xff0000) >> 16,
-                                 (bg & 0xff) << 16 | (bg & 0xff00) | (bg & 0xff0000) >> 16,
-                                 term.private_color_registers);
+      status = sixel_parser_init(st, fg, bg, term.private_color_registers);
       if (status < 0)
         return;
     }
